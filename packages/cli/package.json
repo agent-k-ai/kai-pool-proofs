@@ -11,5 +11,8 @@
   "dependencies": {
     "@kai-pool-proofs/volume-proof": "workspace:*",
     "viem": "2.56.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0"
   }
 }

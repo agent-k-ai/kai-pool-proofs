@@ -1,0 +1,263 @@
+/**
+ * Venue qualification tests: V4/V3 swap log decoding, pool identity,
+ * native venue qualification, min-notional floors, and the dynamic-fee
+ * refusal.
+ *
+ * Apache-2.0. Copyright 2026 Alpha Tech Organization.
+ */
+import { describe, expect, it } from "vitest";
+import { encodeAbiParameters, keccak256, type Address, type Hex } from "viem";
+import {
+  V3_SWAP_TOPIC,
+  V4_SWAP_TOPIC,
+  activityPoolId,
+  decodeV3SwapLog,
+  decodeV4SwapLog,
+  poolKeyQualifies,
+  qualifyActivitySwap,
+  uniswapV3PoolAddress,
+  type ActivityPoolKey,
+} from "./activity-qualification.js";
+
+const WETH = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73" as Address;
+const TOKEN_A = "0x1111111111111111111111111111111111111111" as Address;
+const TOKEN_B = "0x2222222222222222222222222222222222222222" as Address;
+const MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951" as Address;
+const SENDER = "0xF123456789012345678901234567890123456789" as Address;
+
+const KEY: ActivityPoolKey = {
+  currency0: TOKEN_A,
+  currency1: WETH,
+  fee: 2_000_000,
+  tickSpacing: 60,
+  hooks: "0x0000000000000000000000000000000000000000",
+};
+
+function v4Log(amount0: bigint, amount1: bigint, poolId: Hex, sender: Address) {
+  return {
+    address: MANAGER,
+    topics: [
+      V4_SWAP_TOPIC,
+      poolId,
+      `0x${sender.slice(2).padStart(64, "0")}` as Hex,
+    ],
+    data: encodeAbiParameters([{ type: "int128" }, { type: "int128" }], [amount0, amount1]),
+  };
+}
+
+function v3Log(pool: Address, amount0: bigint, amount1: bigint, sender: Address) {
+  return {
+    address: pool,
+    topics: [
+      V3_SWAP_TOPIC,
+      `0x${sender.slice(2).padStart(64, "0")}` as Hex,
+      `0x${sender.slice(2).padStart(64, "0")}` as Hex,
+    ],
+    data: encodeAbiParameters([{ type: "int256" }, { type: "int256" }], [amount0, amount1]),
+  };
+}
+
+describe("swap log decoding", () => {
+  it("decodes a V4 PoolManager Swap log from the caller perspective", () => {
+    const poolId = activityPoolId(KEY);
+    const decoded = decodeV4SwapLog(v4Log(1_000n, -2_000n, poolId, SENDER));
+    expect(decoded.poolId).toBe(poolId);
+    expect(decoded.sender).toBe(SENDER);
+    expect(decoded.amount0).toBe(1_000n);
+    expect(decoded.amount1).toBe(-2_000n);
+    expect(decoded.poolPerspective).toBe(false);
+  });
+
+  it("decodes a V3 pool Swap log from the pool perspective", () => {
+    const pool = "0x3333333333333333333333333333333333333333" as Address;
+    const decoded = decodeV3SwapLog(v3Log(pool, -1_000n, 2_000n, SENDER));
+    expect(decoded.poolId).toBe(`0x${pool.slice(2).padStart(64, "0")}` as Hex);
+    expect(decoded.sender).toBe(SENDER);
+    expect(decoded.amount0).toBe(-1_000n);
+    expect(decoded.amount1).toBe(2_000n);
+    expect(decoded.poolPerspective).toBe(true);
+  });
+
+  it("rejects a log with the wrong topic", () => {
+    const log = v4Log(1n, 1n, `0x${"ab".repeat(32)}`, SENDER);
+    log.topics = [`0x${"00".repeat(32)}`, log.topics[1], log.topics[2]];
+    expect(() => decodeV4SwapLog(log)).toThrow("ACTIVITY_SWAP_LOG_INVALID");
+  });
+
+  it("derives the V4 pool id from the pool key", () => {
+    const id = activityPoolId(KEY);
+    expect(id).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(activityPoolId(KEY)).toBe(id);
+    const other = { ...KEY, fee: 1_000_000 };
+    expect(activityPoolId(other)).not.toBe(id);
+  });
+
+  it("derives the V3 CREATE2 pool address", () => {
+    const factory = "0x1f7d7550b1b028f7571e69a784071f0205fd2efa" as Address;
+    const initCodeHash =
+      "0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54" as Hex;
+    const pool = uniswapV3PoolAddress(factory, initCodeHash, TOKEN_A, WETH, 3000);
+    expect(pool.toLowerCase()).toMatch(/^0x[0-9a-f]{40}$/);
+    // Order independent.
+    expect(uniswapV3PoolAddress(factory, initCodeHash, WETH, TOKEN_A, 3000)).toBe(pool);
+    expect(keccak256).toBeDefined();
+  });
+});
+
+describe("pool key rule", () => {
+  it("accepts a static fee tier", () => {
+    expect(poolKeyQualifies(KEY)).toBe(true);
+  });
+
+  it("refuses a dynamic-fee pool", () => {
+    expect(poolKeyQualifies({ ...KEY, fee: 0x800000 })).toBe(false);
+  });
+});
+
+describe("venue qualification", () => {
+  const entrants = [TOKEN_A, TOKEN_B];
+  const minNotional = { [WETH]: 100n };
+
+  it("qualifies a native venue buy on the V4 leg", () => {
+    const poolId = activityPoolId(KEY);
+    // Caller buys TOKEN_A: receives token (amount0 > 0), spends WETH (amount1 < 0).
+    const swap = decodeV4SwapLog(v4Log(1_000n, -2_000n, poolId, SENDER));
+    const q = qualifyActivitySwap({
+      entrants,
+      metric: 1,
+      raceQuoteAsset: WETH,
+      minNotional,
+      poolKey: KEY,
+      swap,
+    });
+    if (q === null) throw new Error("expected qualification");
+    expect(q.entrantIndex).toBe(0);
+    expect(q.token).toBe(TOKEN_A);
+    expect(q.quoteAsset).toBe(WETH);
+    expect(q.quoteAmount).toBe(2_000n);
+    expect(q.tokenIsOutput).toBe(true);
+  });
+
+  it("qualifies a native venue buy on the V3 leg", () => {
+    const pool = "0x3333333333333333333333333333333333333333" as Address;
+    // Pool perspective: pool gives token (amount0 < 0), receives WETH (amount1 > 0).
+    const swap = decodeV3SwapLog(v3Log(pool, -1_000n, 2_000n, SENDER));
+    const q = qualifyActivitySwap({
+      entrants,
+      metric: 1,
+      raceQuoteAsset: WETH,
+      minNotional,
+      poolKey: KEY,
+      swap,
+    });
+    if (q === null) throw new Error("expected qualification");
+    expect(q.entrantIndex).toBe(0);
+    expect(q.quoteAmount).toBe(2_000n);
+    expect(q.tokenIsOutput).toBe(true);
+  });
+
+  it("counts a sell under the volume metric, flagged tokenIsOutput false", () => {
+    const poolId = activityPoolId(KEY);
+    const swap = decodeV4SwapLog(v4Log(-1_000n, 2_000n, poolId, SENDER));
+    const q = qualifyActivitySwap({
+      entrants,
+      metric: 1,
+      raceQuoteAsset: WETH,
+      minNotional,
+      poolKey: KEY,
+      swap,
+    });
+    if (q === null) throw new Error("expected qualification");
+    expect(q.quoteAmount).toBe(2_000n);
+    expect(q.tokenIsOutput).toBe(false);
+  });
+
+  it("does not qualify a sell under the unique-buyers metric", () => {
+    const poolId = activityPoolId(KEY);
+    const swap = decodeV4SwapLog(v4Log(-1_000n, 2_000n, poolId, SENDER));
+    const q = qualifyActivitySwap({
+      entrants,
+      metric: 2,
+      minNotional,
+      poolKey: KEY,
+      swap,
+    });
+    expect(q).toBeNull();
+  });
+
+  it("qualifies a buy under the unique-buyers metric", () => {
+    const poolId = activityPoolId(KEY);
+    const swap = decodeV4SwapLog(v4Log(1_000n, -2_000n, poolId, SENDER));
+    const q = qualifyActivitySwap({
+      entrants,
+      metric: 2,
+      minNotional,
+      poolKey: KEY,
+      swap,
+    });
+    if (q === null) throw new Error("expected qualification");
+    expect(q.tokenIsOutput).toBe(true);
+  });
+
+  it("does not qualify below the min-notional floor", () => {
+    const poolId = activityPoolId(KEY);
+    const swap = decodeV4SwapLog(v4Log(1n, -50n, poolId, SENDER));
+    const q = qualifyActivitySwap({
+      entrants,
+      metric: 1,
+      raceQuoteAsset: WETH,
+      minNotional,
+      poolKey: KEY,
+      swap,
+    });
+    expect(q).toBeNull();
+  });
+
+  it("does not qualify a swap in a pool without an entrant", () => {
+    const otherKey: ActivityPoolKey = { ...KEY, currency0: TOKEN_B, currency1: WETH };
+    const poolId = activityPoolId(otherKey);
+    const swap = decodeV4SwapLog(v4Log(1_000n, -2_000n, poolId, SENDER));
+    // Entrants are [A, B]; the pool is B/WETH so B should qualify at index 1.
+    const q = qualifyActivitySwap({
+      entrants,
+      metric: 1,
+      raceQuoteAsset: WETH,
+      minNotional,
+      poolKey: otherKey,
+      swap,
+    });
+    if (q === null) throw new Error("expected qualification");
+    expect(q.entrantIndex).toBe(1);
+    const noEntrant: ActivityPoolKey = {
+      ...KEY,
+      currency0: "0x9999999999999999999999999999999999999999" as Address,
+    };
+    const q2 = qualifyActivitySwap({
+      entrants,
+      metric: 1,
+      raceQuoteAsset: WETH,
+      minNotional,
+      poolKey: noEntrant,
+      swap: decodeV4SwapLog(
+        v4Log(1_000n, -2_000n, activityPoolId(noEntrant), SENDER),
+      ),
+    });
+    expect(q2).toBeNull();
+  });
+
+  it("ignores a non-race quote asset under the volume metric", () => {
+    const usdc = "0x5fc5360d0400a0fd4f2af552add042d716f1d168" as Address;
+    const key: ActivityPoolKey = { ...KEY, currency1: usdc };
+    const poolId = activityPoolId(key);
+    const swap = decodeV4SwapLog(v4Log(1_000n, -2_000n, poolId, SENDER));
+    const q = qualifyActivitySwap({
+      entrants,
+      metric: 1,
+      raceQuoteAsset: WETH,
+      minNotional: { [usdc]: 0n },
+      poolKey: key,
+      swap,
+    });
+    expect(q).toBeNull();
+  });
+});
