@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "method": "Adapted/reimplemented source semantics; no parent repository history imported",
+  "references": [
+    {
+      "purpose": "ABI encoding reference",
+      "commit": "e87371df991ab6ebacc1468e13126e53779c8a5f",
+      "path": "experiments/complete-race-proof/core/src/lib.rs",
+      "gitBlob": "58b58d4a7f68801b3ad66ebcbf926bd8f5aa729a",
+      "sha256": "e815f4c9f317216eab7a658e26eb34a5d375fdc44cdef003f06b78758967e558",
+      "license": "Apache-2.0 (project source)"
+    },
+    {
+      "purpose": "Header RLP canonical-length reference",
+      "commit": "e87371df991ab6ebacc1468e13126e53779c8a5f",
+      "path": "experiments/complete-race-proof/core/src/trie.rs",
+      "gitBlob": "3153763d5a2f6b1b1e3933d864cb515d73ef9f6f",
+      "sha256": "bdf128c89dab522f16924ec4d48a2e0d58a416c8a61783d3a51854c8b2089a7f",
+      "license": "Apache-2.0 (project source)"
+    },
+    {
+      "purpose": "Volume constants and predicate",
+      "commit": "6302d37e79ea3002ed79e5aabc3072947cedd5a9",
+      "path": "src/adapters/PonsActivityRaceProofAdapter.sol",
+      "gitBlob": "f03b6903a86357f1c17a50cd28c67a430303d5b9",
+      "sha256": "0b22854314b14cf7c2a4ce8a1c37e2ec9549b048beb20cd7f73199bc47c77998",
+      "license": "Apache-2.0 (project source)"
+    },
+    {
+      "purpose": "PoolKey and venue interface",
+      "commit": "6302d37e79ea3002ed79e5aabc3072947cedd5a9",
+      "path": "src/interfaces/IPonsActivityRaceAdapter.sol",
+      "gitBlob": "fe7a3bdc26d967668860686db72a5fa320707e5f",
+      "sha256": "704dde75f75edfc9444446efdc0fb339fbb6314055c42bad3114a9bf333fc9e8",
+      "license": "Apache-2.0 (project source)"
+    },
+    {
+      "purpose": "Nitro header encoding reference",
+      "commit": "267a9f6089c6568b4fb3aef241b31e77db304266",
+      "path": "packages/sdk/src/pons-block-proof.ts",
+      "gitBlob": "b8fd2c3d3810ec7327c1ec53dd0b0a12e1e5cfa9",
+      "sha256": "b6e53830bcceb742cb4f8a2b3b4fb78cbaa952e34a51bc7db58b2a70a166d3cc",
+      "license": "Apache-2.0 (project source)"
+    },
+    {
+      "purpose": "Nitro header format reference",
+      "commit": "267a9f6089c6568b4fb3aef241b31e77db304266",
+      "path": "src/proof/RobinhoodBlockHeader.sol",
+      "gitBlob": "c73415f1aa07040a89ac2ebb9b8d9134d841f2c8",
+      "sha256": "99b7a8862bab682456ed64d78d3f4fe1d10a1a02089cfa68e8dbe8337dde8230",
+      "license": "Apache-2.0 (project source)"
+    },
+    {
+      "purpose": "Captured native PoolKey",
+      "commit": "6302d37e79ea3002ed79e5aabc3072947cedd5a9",
+      "path": "test/fixtures/pons-activity-testnet-native-swaps.json",
+      "gitBlob": "ff3f5fb176ea1af493d4c9f5c28c68c60c3b68c7",
+      "sha256": "2114e554b06967171d6a5945bcfd296392df04227b26f74f51e46c2ceef6e963",
+      "license": "Apache-2.0 (project source)"
+    }
+  ],
+  "specificationSha256": "84b0e23e13a9d65fb4ece96d10ab21bbcd437670ee0e58ffd037aba7f38b2c70",
+  "publicBase": "78ad438078575f9d518b9a9e14b0469578af0c56",
+  "scope": "Pure core only. Base receipt CLI/schema review issues are not repaired or approved."
+}

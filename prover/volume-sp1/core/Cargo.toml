@@ -1,0 +1,20 @@
+[package]
+name = "kai-volume-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Pure ABI, Nitro header and V4 volume primitives; not a proof verifier"
+
+[workspace]
+
+[dependencies]
+sha3 = "=0.10.8"
+
+[dev-dependencies]
+serde_json = "=1.0.149"
+
+[profile.dev]
+codegen-units = 1
+
+[profile.test]
+codegen-units = 1

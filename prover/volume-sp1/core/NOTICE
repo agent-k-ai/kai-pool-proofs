@@ -1,0 +1,11 @@
+kai-volume-core
+Copyright 2026 Alpha Tech Organization
+
+Licensed under Apache-2.0; see LICENSE.
+Header RLP and ABI encoding checks are adapted from the Apache-2.0
+complete-race-core experiment. V4 qualification follows the Apache-2.0
+Pons activity adapter. SOURCE-ORIGINS.json identifies exact source objects.
+No PRICE guest or verification key is included or changed.
+
+RustCrypto sha3 and its dependencies retain their own licenses through Cargo.
+See THIRD_PARTY_NOTICES.md and Cargo.lock. No third-party Rust source is vendored.
