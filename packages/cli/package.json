@@ -1,0 +1,15 @@
+{
+  "name": "@kai-pool-proofs/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Public VOLUME proof CLI: fetch, verify, plan, submit, confirm, rewards, claim. Own RPC and own wallet only.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@kai-pool-proofs/volume-proof": "workspace:*",
+    "viem": "2.56.1"
+  }
+}

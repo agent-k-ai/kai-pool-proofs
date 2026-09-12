@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2026-09-12T15:50:00Z",
+  "generatedBy": "operator-pi-qwenbrain",
+  "purpose": "License and source extraction inventory for the public kai-pool-proofs repository (task 11300, C0). Records the exact parent-repo files extracted or to be extracted, their blob identity at the pinned commit, their license, and the coupling that must be removed during extraction.",
+  "sourceRepository": {
+    "name": "alpha-tech-org/agent-kai-prediction-market",
+    "host": "forgejo.agentxbook.ai",
+    "pin": "00f4ec0effe091216896e1ee44d733e57ebfe1e6",
+    "pinRef": "release-01.09.06b tip (includes PR #60 merge)",
+    "license": "Apache-2.0",
+    "licenseFile": "LICENSE",
+    "copyright": "Copyright 2026 Alpha Tech Organization"
+  },
+  "extractionRules": [
+    "Remove DB/Silver coupling (pg Pool, redis, Silver service clients).",
+    "Remove private SDK registry assumptions (no @agent-kai internal package imports in the public build).",
+    "Remove hard-coded mainnet/internal defaults (Robinhood mainnet addresses become config or test fixtures only).",
+    "Remove operator RPC URLs, internal DNS names, keystores, and A2A/taskboard material.",
+    "Retain Apache-2.0 source notices in every extracted file.",
+    "Retain MIT Optimism/OpenZeppelin notices and exact dependency pins.",
+    "Do not relabel third-party code."
+  ],
+  "files": [
+    {
+      "sourcePath": "packages/sdk/src/ethereum-state-proof.ts",
+      "blobSha": "fe4b0c5f3d4403e1d89fd625bd76d302950e28cc",
+      "lines": 169,
+      "targetPath": "packages/volume-proof/src/ethereum-state-proof.ts",
+      "license": "Apache-2.0 (parent); MPT verification logic ported from MIT Optimism trie libraries pinned at 29bec1e4d0e9ab90f9132e418cdc2b0f9756483c",
+      "imports": ["viem"],
+      "couplingToRemove": "none (pure)",
+      "status": "extract"
+    },
+    {
+      "sourcePath": "packages/sdk/src/receipt-proof.ts",
+      "blobSha": "16a5564a06f1f3370b0ea1ac5886aea2e63a44f7",
+      "lines": 351,
+      "targetPath": "packages/volume-proof/src/receipt-proof.ts",
+      "license": "Apache-2.0 (parent)",
+      "imports": ["viem", "./ethereum-state-proof.js"],
+      "couplingToRemove": "none (pure)",
+      "status": "extract"
+    },
+    {
+      "sourcePath": "packages/sdk/src/bounded-json-rpc.ts",
+      "blobSha": "b3963d97e0b24a187734d7e02e1bbc76f12cde36",
+      "lines": 67,
+      "targetPath": "packages/volume-proof/src/bounded-json-rpc.ts",
+      "license": "Apache-2.0 (parent)",
+      "imports": ["viem"],
+      "couplingToRemove": "none (pure bounded fetch wrapper)",
+      "status": "extract"
+    },
+    {
+      "sourcePath": "packages/sdk/src/pons-block-proof.ts",
+      "blobSha": "b8fd2c3d3810ec7327c1ec53dd0b0a12e1e5cfa9",
+      "lines": 670,
+      "targetPath": "packages/volume-proof/src/pons-block-proof.ts",
+      "license": "Apache-2.0 (parent)",
+      "imports": ["viem", "./bounded-json-rpc.js", "./ethereum-state-proof.js"],
+      "couplingToRemove": "hard-coded chain defaults; keep the fixed 16-field Nitro RLP header codec (encodeRobinhoodHeader) as the portable header codec",
+      "status": "extract"
+    },
+    {
+      "sourcePath": "packages/sdk/src/pons-activity-race.ts",
+      "blobSha": "4dbd3c2fdf434ca401d2d36b13900836522eaa71",
+      "lines": 297,
+      "targetPath": "packages/volume-proof/src/pons-activity-race.ts",
+      "license": "Apache-2.0 (parent)",
+      "imports": ["viem", "./abis.js"],
+      "couplingToRemove": "hard-coded Robinhood mainnet addresses (ROBINHOOD_POOL_MANAGER, ROBINHOOD_PONS_V2_FACTORY, ROBINHOOD_WETH, etc.) become injected config; keep volume qualification logic, Swap log decoding, entrant-order checks, native address(0) handling",
+      "status": "extract"
+    },
+    {
+      "sourcePath": "services/race-stream/src/receipt-capture.ts",
+      "blobSha": "3a6514660d56a42f0eb0af5d52c6c0c640ea481d",
+      "lines": 148,
+      "targetPath": "packages/volume-proof/src/receipt-capture.ts",
+      "license": "Apache-2.0 (parent)",
+      "imports": ["@agent-kai/prediction-sdk (internal)", "viem", "./rpc.js (ReadRpc type)", "./activity-plan.js (types)", "./data.js (naturalKey)"],
+      "couplingToRemove": "internal SDK import; keep pure parts: globalLogIndex, receiptLocalIndex, ReceiptBlock shape, captureReceiptBlock (injected ReadRpc), buildActivityProofs",
+      "status": "extract-pure-parts"
+    },
+    {
+      "sourcePath": "services/race-stream/src/rpc.ts",
+      "blobSha": "cdfbc95d58ff835e2a0740a88741ae421bce0911",
+      "lines": 138,
+      "targetPath": "packages/volume-proof/src/rpc.ts",
+      "license": "Apache-2.0 (parent)",
+      "imports": ["viem"],
+      "couplingToRemove": "keep the ReadRpc port interface only; drop any operator endpoint defaults",
+      "status": "extract-type"
+    },
+    {
+      "sourcePath": "services/race-stream/src/activity-plan.ts",
+      "blobSha": "03f0157862111de8b7e9ca18c1437b186f18c61b",
+      "lines": 114,
+      "targetPath": "packages/volume-proof/src/activity-plan.ts",
+      "license": "Apache-2.0 (parent)",
+      "imports": ["viem"],
+      "couplingToRemove": "keep ActivityCandidate/ActivityKeeperState/ActivitySwapProof types and pure planning logic; drop DB persistence",
+      "status": "extract-pure-parts"
+    },
+    {
+      "sourcePath": "services/race-stream/src/data.ts",
+      "blobSha": "25d820696de3fe5f1fe87b3a57275bef8d5d75a7",
+      "lines": 148,
+      "targetPath": "packages/volume-proof/src/data.ts",
+      "license": "Apache-2.0 (parent)",
+      "imports": ["viem"],
+      "couplingToRemove": "keep naturalKey and pure helpers only; drop DB/Silver coupling",
+      "status": "extract-pure-parts"
+    }
+  ],
+  "abiBridge": {
+    "note": "F7: the public activity ABI bridge (packages/volume-proof/src/abi.ts) is generated from the final reviewed contract artifacts handed off by Lenny. At C0 checkpoint time the artifacts are not yet published; the bridge consumes the PR49/PR52 preserved ABI: submitSwaps(uint256,address[],bytes,(uint32,uint32,(address,address,uint24,int24,address),bytes[])[]), proofCreditsFor(uint256,address), totalProofCredits(uint256), proverPool(uint256), totalAccepted(uint256), claimBounty(uint256,address), settleRace(uint256), invalidateExpired(uint256). The legacy proofCredits(uint256) -> (address[],uint16[],uint16) compatibility view is preserved and saturated.",
+    "status": "pending-lenny-artifacts"
+  },
+  "dependencies": [
+    { "name": "viem", "version": "2.56.1", "license": "MIT" },
+    { "name": "zod", "version": "4.5.4", "license": "MIT" }
+  ],
+  "excluded": [
+    "operator Postgres schema and dumps",
+    "signer service and keystores",
+    "internal DNS names and authenticated RPC URLs",
+    "A2A/taskboard/PM material",
+    "private Git history and remotes",
+    "generated private state",
+    "SP1 images and price guest code"
+  ]
+}

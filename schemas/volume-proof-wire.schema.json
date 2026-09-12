@@ -1,0 +1,341 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/agent-k-ai/kai-pool-proofs/schemas/volume-proof-wire.schema.json",
+  "title": "VOLUME proof wire schema",
+  "description": "Shared wire contract for the public VOLUME proof library and CLI (task 11300, spec section 6). Owned by Qwen with Halo agreement. Schema version is owned by Qwen; endpoint field/route renames require Qwen sign-off. All block numbers and token amounts are decimal strings (JSON-safe bigints). Addresses are EIP-55 checksummed except inside raceKey, which is lowercase. termsHash is the keccak256 of the RFC 8785 (JCS) canonical JSON encoding of the VolumeTerms object.",
+  "schemaVersion": "1.0.0",
+  "$defs": {
+    "address": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "EIP-55 checksummed Ethereum address."
+    },
+    "hex": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]*$"
+    },
+    "decimalString": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "description": "Non-negative integer, decimal, no leading zeros."
+    },
+    "blockNumber": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "description": "Block number as decimal string."
+    },
+    "raceKey": {
+      "type": "string",
+      "pattern": "^46630:0x[0-9a-f]{40}:(0|[1-9][0-9]*)$",
+      "description": "46630:lowercaseController:decimalRaceId"
+    },
+    "RaceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chainId", "controller", "raceId"],
+      "properties": {
+        "chainId": { "const": 46630 },
+        "controller": { "$ref": "#/$defs/address" },
+        "raceId": { "$ref": "#/$defs/decimalString" }
+      },
+      "description": "Public identity of one activity race."
+    },
+    "PoolKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency0", "currency1", "fee", "tickSpacing", "hooks"],
+      "properties": {
+        "currency0": { "$ref": "#/$defs/address" },
+        "currency1": { "$ref": "#/$defs/address" },
+        "fee": { "type": "integer", "minimum": 0, "maximum": 16777215, "description": "uint24 Uniswap v4 fee. 0 for dynamic-fee hooks." },
+        "tickSpacing": { "type": "integer", "minimum": -2147483648, "maximum": 2147483647, "description": "int24" },
+        "hooks": { "$ref": "#/$defs/address" }
+      },
+      "description": "Uniswap v4 PoolKey. Native ETH stays address(0) in the key and hash; only its accounting quote is normalized to the pinned wrapper."
+    },
+    "Venue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entrant", "poolKey", "quoteIsCurrency0"],
+      "properties": {
+        "entrant": { "$ref": "#/$defs/address", "description": "Entrant token address, in original race order." },
+        "poolKey": { "$ref": "#/$defs/PoolKey" },
+        "quoteIsCurrency0": { "type": "boolean", "description": "True when the quote side is currency0 of this pool key." }
+      },
+      "description": "One pinned entrant venue: the exact v4 pool where the entrant trades the quote."
+    },
+    "PolicyStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionStatus"],
+      "properties": {
+        "decisionStatus": { "enum": ["pending", "approved", "rejected"], "description": "D1 (staging/closure) and D2 (pool-funded rewards) status. pending means the user decision is not recorded." },
+        "closureScope": { "type": ["string", "null"], "description": "D1: whether a limited lower-bound demonstration may precede exhaustive verification, or exhaustive verification must precede settlement." },
+        "fundingBase": { "type": ["string", "null"], "description": "D2: gross-deposit, losing-stake, losing-fee, or null." },
+        "rateBps": { "type": ["integer", "null"], "minimum": 0, "maximum": 10000 },
+        "settlerAllocation": { "type": ["string", "null"] },
+        "fundingGuarantee": { "type": ["string", "null"] },
+        "shortfallBehavior": { "type": ["string", "null"] },
+        "zeroCreditReserveDisposition": { "type": ["string", "null"], "description": "F5: where the unused zero-proof reserve returns on normal close and expiry." }
+      },
+      "description": "Current funding/closure policy status. Unknown values stay null. Signing and deployment plans reject required unresolved values. An off-chain flag does not restrict a permissionless contract's settlement method."
+    },
+    "RewardReads": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["atBlock", "proverPool", "totalAccepted"],
+      "properties": {
+        "atBlock": { "$ref": "#/$defs/blockNumber" },
+        "proverPool": { "$ref": "#/$defs/decimalString", "description": "V2 controller proverPool(raceId), raw collateral units." },
+        "totalAccepted": { "$ref": "#/$defs/decimalString", "description": "V2 controller totalAccepted(raceId), raw collateral units." }
+      },
+      "description": "Reward contract reads at a named block. These are observations, not entitlements."
+    },
+    "VolumeTerms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "identity",
+        "adapter",
+        "pool",
+        "sourceIdentity",
+        "abiDigest",
+        "runtimeCodeHash",
+        "entrants",
+        "entrantsHash",
+        "venues",
+        "metric",
+        "quoteToken",
+        "rawNative",
+        "wrapper",
+        "collateral",
+        "collateralDecimals",
+        "startBlock",
+        "snapshotBlock",
+        "bettingCutoff",
+        "proofDeadline",
+        "historyWindowBlocks",
+        "policy",
+        "rewardReads"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "identity": { "$ref": "#/$defs/RaceIdentity" },
+        "adapter": { "$ref": "#/$defs/address", "description": "PonsActivityRaceProofAdapter address. submitSwaps target." },
+        "pool": { "$ref": "#/$defs/address", "description": "PonsActivityRacePoolV2 address (bettor deposits/claims, not prover rewards)." },
+        "sourceIdentity": { "type": "string", "description": "Exact source commit the contract artifacts were built from." },
+        "abiDigest": { "$ref": "#/$defs/hex", "description": "keccak256 of the canonical ABI JSON for adapter + controller." },
+        "runtimeCodeHash": { "$ref": "#/$defs/hex", "description": "keccak256 of the deployed adapter runtime bytecode at the named block." },
+        "entrants": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/address" },
+          "description": "Original ordered entrants. Order is part of the proof."
+        },
+        "entrantsHash": { "$ref": "#/$defs/hex", "description": "keccak256 of the packed ordered entrant array, as committed by the controller." },
+        "venues": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/Venue" },
+          "description": "Full pinned keys/venues, aligned with entrants order."
+        },
+        "metric": { "const": 1, "description": "1 = volume_quote. The VOLUME race metric." },
+        "quoteToken": { "$ref": "#/$defs/address", "description": "Pinned quote token (six-decimal collateral for the testnet family)." },
+        "rawNative": { "const": "0x0000000000000000000000000000000000000000", "description": "Native ETH stays address(0) in the v4 key and hash." },
+        "wrapper": { "$ref": "#/$defs/address", "description": "18-decimal native wrapper used for accounting normalization only." },
+        "collateral": { "$ref": "#/$defs/address", "description": "Six-decimal collateral token. claimBounty pays this ERC20, not native ETH." },
+        "collateralDecimals": { "const": 6 },
+        "startBlock": { "$ref": "#/$defs/blockNumber" },
+        "snapshotBlock": { "$ref": "#/$defs/blockNumber" },
+        "bettingCutoff": { "$ref": "#/$defs/blockNumber", "description": "Actual betting cutoff: snapshotBlock - 600. Not the adapter's legacy betCloseBlock field." },
+        "proofDeadline": { "$ref": "#/$defs/blockNumber", "description": "snapshotBlock + 36000 proof grace. Submit while current <= snapshot + grace." },
+        "historyWindowBlocks": { "const": 393168, "description": "Adapter history authentication window. Not a statement of RPC retention." },
+        "policy": { "$ref": "#/$defs/PolicyStatus" },
+        "rewardReads": { "$ref": "#/$defs/RewardReads" }
+      },
+      "description": "Everything a prover needs to build and check VOLUME proofs for one race, plus the explicit policy status. termsHash = keccak256(JCS(this object))."
+    },
+    "WitnessBlockEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blockHash", "objectHash", "bytes"],
+      "properties": {
+        "blockHash": { "$ref": "#/$defs/hex" },
+        "objectHash": { "$ref": "#/$defs/hex", "description": "keccak256 of the ReceiptBlock object served for this block." },
+        "bytes": { "type": "integer", "minimum": 0, "description": "Measured byte size of the served ReceiptBlock." }
+      }
+    },
+    "MissingRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "$ref": "#/$defs/blockNumber" },
+        "to": { "$ref": "#/$defs/blockNumber" }
+      },
+      "description": "Inclusive block range with no served witness."
+    },
+    "WitnessManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "raceKey",
+        "termsHash",
+        "generation",
+        "canonical",
+        "verified",
+        "blocks",
+        "missingRanges",
+        "availableUntil"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "raceKey": { "$ref": "#/$defs/raceKey" },
+        "termsHash": { "$ref": "#/$defs/hex" },
+        "generation": { "type": "integer", "minimum": 1, "description": "Increments on reorg or re-capture. Reorged generations are invalidated." },
+        "canonical": { "type": "boolean", "description": "Witnesses are served only when canonical AND verified at the serving snapshot." },
+        "verified": { "type": "boolean" },
+        "blocks": { "type": "array", "items": { "$ref": "#/$defs/WitnessBlockEntry" } },
+        "missingRanges": { "type": "array", "items": { "$ref": "#/$defs/MissingRange" } },
+        "availableUntil": { "type": "string", "format": "date-time", "description": "Public witnesses are retained at least 30 days and never purged while needed by an enabled proof window. Earned on-chain claims do not expire because witnesses are purged." }
+      },
+      "description": "Paginated witness availability for one race generation."
+    },
+    "ReceiptLog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["address", "topics", "data"],
+      "properties": {
+        "address": { "$ref": "#/$defs/address" },
+        "topics": { "type": "array", "items": { "$ref": "#/$defs/hex" } },
+        "data": { "$ref": "#/$defs/hex" }
+      }
+    },
+    "BlockReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transactionIndex", "type", "status", "cumulativeGasUsed", "logsBloom", "logs"],
+      "properties": {
+        "transactionIndex": { "type": "integer", "minimum": 0 },
+        "type": { "type": "integer", "minimum": 0, "description": "EIP-2718 transaction type. 0 = legacy receipt with no type prefix." },
+        "status": { "type": "integer", "enum": [0, 1] },
+        "cumulativeGasUsed": { "$ref": "#/$defs/decimalString" },
+        "logsBloom": { "$ref": "#/$defs/hex" },
+        "logs": { "type": "array", "items": { "$ref": "#/$defs/ReceiptLog" } }
+      },
+      "description": "The receipt fields committed by the block header's receiptsRoot, keyed by transactionIndex."
+    },
+    "ReceiptBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "blockHash", "encodedHeader", "receiptsRoot", "receipts"],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "blockHash": { "$ref": "#/$defs/hex" },
+        "encodedHeader": { "$ref": "#/$defs/hex", "description": "Fixed 16-field Nitro RLP header encoding. The client recomputes its hash independently." },
+        "receiptsRoot": { "$ref": "#/$defs/hex" },
+        "receipts": { "type": "array", "items": { "$ref": "#/$defs/BlockReceipt" }, "description": "Full typed receipt list for the block. eth_getBlockByNumber returns transactions, not receipts: the server uses eth_getBlockReceipts or fetches every transaction receipt." }
+      },
+      "description": "One canonical, verified block: header, receipts root, and the complete receipt list."
+    },
+    "SwapProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["swapId", "txIndex", "receiptLocalLogIndex", "poolKey", "rawAmount", "receiptProof"],
+      "properties": {
+        "swapId": { "type": "string", "pattern": "^[0-9a-f]{64}:[0-9]+:[0-9]+$", "description": "blockHashHexNoPrefix:txIndex:receiptLocalLogIndex. Deterministic dedupe id." },
+        "txIndex": { "type": "integer", "minimum": 0, "maximum": 4294967295, "description": "uint32" },
+        "receiptLocalLogIndex": { "type": "integer", "minimum": 0, "maximum": 4294967295, "description": "uint32, index within the transaction's own receipt logs." },
+        "poolKey": { "$ref": "#/$defs/PoolKey" },
+        "rawAmount": { "$ref": "#/$defs/decimalString", "description": "Absolute quote-side Swap delta in raw units, above the configured floor. Buys and sells both count." },
+        "receiptProof": { "type": "array", "items": { "$ref": "#/$defs/hex" }, "minItems": 1, "description": "Receipt trie proof nodes for this transaction's receipt." }
+      },
+      "description": "Wire form of the contract tuple (uint32 txIndex, uint32 receiptLocalLogIndex, PoolKey, bytes[] receiptProof)."
+    },
+    "ProofBatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blockHash", "swaps"],
+      "properties": {
+        "blockHash": { "$ref": "#/$defs/hex" },
+        "swaps": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/SwapProof" } }
+      },
+      "description": "One submitSwaps call authenticates one header and 1-64 qualifying swaps. Duplicates or invalid proofs revert the entire call and all its credits."
+    },
+    "CostCaps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxCalldataBytes", "maxGas", "maxNativeSpend"],
+      "properties": {
+        "maxCalldataBytes": { "type": "integer", "minimum": 0 },
+        "maxGas": { "$ref": "#/$defs/decimalString" },
+        "maxNativeSpend": { "$ref": "#/$defs/decimalString", "description": "User spend cap in wei. Refreshed before signing." }
+      }
+    },
+    "ProofPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "raceKey", "abiDigest", "sourceIdentity", "termsHash", "batches", "costCaps", "txHash"],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "raceKey": { "$ref": "#/$defs/raceKey" },
+        "abiDigest": { "$ref": "#/$defs/hex" },
+        "sourceIdentity": { "type": "string" },
+        "termsHash": { "$ref": "#/$defs/hex" },
+        "batches": { "type": "array", "items": { "$ref": "#/$defs/ProofBatch" } },
+        "costCaps": { "$ref": "#/$defs/CostCaps" },
+        "txHash": { "type": "null", "description": "Always null in a plan. A plan is prepared state, never a submission." }
+      },
+      "description": "One-block SwapProof batches with selected swap ids and raw amounts, plus cost caps. Prepared/calldata hashes stay distinct from real transaction hashes."
+    },
+    "SubmissionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blockHash", "status", "gasUsed"],
+      "properties": {
+        "blockHash": { "$ref": "#/$defs/hex", "description": "Canonical block hash of the mined submission." },
+        "status": { "type": "integer", "enum": [0, 1] },
+        "gasUsed": { "$ref": "#/$defs/decimalString" }
+      }
+    },
+    "CreditDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prover", "before", "after", "delta"],
+      "properties": {
+        "prover": { "$ref": "#/$defs/address" },
+        "before": { "$ref": "#/$defs/decimalString" },
+        "after": { "$ref": "#/$defs/decimalString" },
+        "delta": { "$ref": "#/$defs/decimalString" }
+      },
+      "description": "Wide uint256 credit movement read via proofCreditsFor before and after the submission."
+    },
+    "Submission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "raceKey", "txHash", "sender", "to", "receipt", "creditDeltas"],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "raceKey": { "$ref": "#/$defs/raceKey" },
+        "txHash": { "$ref": "#/$defs/hex", "description": "Actual mined transaction hash. A DB enqueue, local test, synthetic hash, or PENDING_BROADCAST state is not a submission." },
+        "sender": { "$ref": "#/$defs/address" },
+        "to": { "$ref": "#/$defs/address", "description": "Adapter destination." },
+        "receipt": { "$ref": "#/$defs/SubmissionReceipt" },
+        "creditDeltas": { "type": "array", "items": { "$ref": "#/$defs/CreditDelta" } }
+      },
+      "description": "Confirmed submission: real tx hash, canonical receipt, and the accepted credit deltas. SwapProven/ActivityTally events and exact deltas are checked before this object is written."
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/RaceIdentity" },
+    { "$ref": "#/$defs/VolumeTerms" },
+    { "$ref": "#/$defs/WitnessManifest" },
+    { "$ref": "#/$defs/ReceiptBlock" },
+    { "$ref": "#/$defs/ProofPlan" },
+    { "$ref": "#/$defs/Submission" }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@kai-pool-proofs/volume-proof",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Pure VOLUME proof logic: wire schema, header/receipt-root verification, venue qualification, Swap batch building.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "viem": "2.56.1",
+    "zod": "4.5.4"
+  }
+}
