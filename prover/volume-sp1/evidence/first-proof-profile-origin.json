@@ -1,0 +1,8 @@
+{
+  "host": "gpubox",
+  "sourcePath": "/home/atcsecure/agent-work/sp1-four-entrant-20260911T182237Z/repo/experiments/complete-race-proof/toolchain/cpu-serial.conf",
+  "sha256": "c6e92c91bd9130103e0a36f1aaf1325882f6e004a73e536c7da544a1698d2eb4",
+  "derivation": "Unmodified retained PRICE serial worker profile; container CPU and RAM envelope separately reduced to 8 CPU and 48 GiB.",
+  "sourceCommit": "2312c3198652e7bf9cd44e7a1acbc2d1c7b2f1c4",
+  "profileCleanAtSourceCommit": true
+}

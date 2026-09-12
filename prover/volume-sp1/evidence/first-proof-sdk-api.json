@@ -1,0 +1,44 @@
+{
+  "files": {
+    "sp1-sdk-6.7.0/src/prover.rs": {
+      "sha256": "7b31ea979a6ff09067aeb8e05379ac30c2611f869ba7e34e04d6fb5e87276c45",
+      "bytes": 10791
+    },
+    "sp1-sdk-6.7.0/src/cpu/mod.rs": {
+      "sha256": "1fa72b3e0cbd4578e416fb0ae4d5c4b171ffd8b84d14f5da5d79f2a4d586ea02",
+      "bytes": 4104
+    },
+    "sp1-sdk-6.7.0/src/light/mod.rs": {
+      "sha256": "2459755ad81f94e44ce5a35bfb35c7fb1f669169d8627f9678f9d0fa097076e2",
+      "bytes": 4597
+    },
+    "sp1-sdk-6.7.0/src/proof.rs": {
+      "sha256": "94cf6f081f9578d440293b67d1f6b6e9b034214cc2e38b52496f072fd9916382",
+      "bytes": 17177
+    },
+    "sp1-sdk-6.7.0/src/lib.rs": {
+      "sha256": "a8303b0ce4374d3c7e0de1c3ba4d23c2ca395d64128cc1dd13e970a27b3fa761",
+      "bytes": 13304
+    },
+    "sp1-prover-6.7.0/src/worker/config.rs": {
+      "sha256": "43eb3d98d7b187c237cbd361b73f185ac6ccae0f25335763a9efeb64f2b869d5",
+      "bytes": 9468
+    },
+    "sp1-prover-6.7.0/src/vk_map.bin": {
+      "sha256": "24cd296179e3490509cdb770a7af5c09470ee2f9232296c1033aed336565bb12",
+      "bytes": 7434488
+    },
+    "sp1-prover-6.7.0/compress_shape.json": {
+      "sha256": "ec417e3f34df93d65424925ea94437211ad6f36f124e94d90fa7ecc272edadbb",
+      "bytes": 287
+    }
+  },
+  "observations": {
+    "defaultSuccess": "sp1-sdk/src/prover.rs:150 status_code.unwrap_or(StatusCode::SUCCESS)",
+    "compressedStatus": "sp1-sdk/src/prover.rs:193-222 checks recursion public-values exit and committed digest",
+    "cryptographicVerifier": "sp1-sdk/src/prover.rs:257 node.verify(vkey, &bundle.proof)",
+    "independentBackend": "sp1-sdk/src/light/mod.rs implements setup and inherits full cryptographic Prover::verify",
+    "compressedSerialization": "SP1ProofWithPublicValues.save/load uses bincode; bytes() is not a compressed proof export",
+    "recursionDesign": "No range guest or verify_sp1_proof integration changed."
+  }
+}

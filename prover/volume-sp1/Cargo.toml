@@ -4,7 +4,7 @@ default-members = ["primitives", "core", "trie", "chunk"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0-eval.20260912c"
+version = "0.1.0-eval.20260912d"
 edition = "2021"
 license = "Apache-2.0"
 publish = false

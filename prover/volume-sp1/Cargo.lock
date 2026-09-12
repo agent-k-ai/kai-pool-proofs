@@ -1803,7 +1803,7 @@ dependencies = [
 
 [[package]]
 name = "kai-volume-chunk"
-version = "0.1.0-eval.20260912c"
+version = "0.1.0-eval.20260912d"
 dependencies = [
  "hex",
  "kai-volume-core",
@@ -1814,7 +1814,7 @@ dependencies = [
 
 [[package]]
 name = "kai-volume-core"
-version = "0.1.0-eval.20260912c"
+version = "0.1.0-eval.20260912d"
 dependencies = [
  "kai-volume-primitives",
  "serde_json",
@@ -1822,7 +1822,7 @@ dependencies = [
 
 [[package]]
 name = "kai-volume-primitives"
-version = "0.1.0-eval.20260912c"
+version = "0.1.0-eval.20260912d"
 dependencies = [
  "tiny-keccak",
 ]
@@ -5153,14 +5153,14 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "volume-chunk-build"
-version = "0.1.0-eval.20260912c"
+version = "0.1.0-eval.20260912d"
 dependencies = [
  "sp1-build",
 ]
 
 [[package]]
 name = "volume-chunk-guest"
-version = "0.1.0-eval.20260912c"
+version = "0.1.0-eval.20260912d"
 dependencies = [
  "kai-volume-chunk",
  "sp1-zkvm",
@@ -5168,19 +5168,21 @@ dependencies = [
 
 [[package]]
 name = "volume-chunk-host"
-version = "0.1.0-eval.20260912c"
+version = "0.1.0-eval.20260912d"
 dependencies = [
+ "bincode",
  "hex",
  "kai-volume-chunk",
  "serde_json",
  "sha2",
  "sp1-sdk",
+ "sp1-prover",
  "tokio",
 ]
 
 [[package]]
 name = "volume-trie"
-version = "0.1.0-eval.20260912c"
+version = "0.1.0-eval.20260912d"
 dependencies = [
  "hex",
  "kai-volume-primitives",
