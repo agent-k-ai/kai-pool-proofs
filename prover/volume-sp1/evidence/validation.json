@@ -1,0 +1,20 @@
+{
+  "release": "0.1.0-eval.20260912c",
+  "nativeIntegrationTestsPassed": 60,
+  "testSplit": {
+    "originalCore": 15,
+    "originalTrie": 34,
+    "integratedChunk": 11
+  },
+  "rustAndCargoManifestFilesMatchRemoteTestedSource": 35,
+  "retainedTestVectorFiles": 14,
+  "guestElfSha256": "d81a33578657f97389f32809739bd8b2a98246372d98ff30581515167762679c",
+  "pinnedImage": "sha256:25377190a4580d1f3708b56f92a83881f6db1d5056bd4a9872852f70ff07141d",
+  "compiler": "rustc 1.94.0-dev (LLVM 21.1.8)",
+  "cargo": "1.98.1 (797e8a9bc 2026-08-05)",
+  "sdk": "6.7.0",
+  "circuit": "v6.1.0",
+  "cryptographicProofsGenerated": 0,
+  "cryptographicProofsVerified": 0,
+  "publications": 0
+}

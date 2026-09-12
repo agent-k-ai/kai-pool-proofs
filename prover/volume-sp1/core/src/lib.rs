@@ -37,7 +37,4 @@ impl core::fmt::Display for Error {
 }
 impl std::error::Error for Error {}
 
-pub fn keccak256(bytes: &[u8]) -> Hash {
-    use sha3::{Digest, Keccak256};
-    Keccak256::digest(bytes).into()
-}
+pub use kai_volume_primitives::keccak as keccak256;

@@ -1,0 +1,22 @@
+{
+  "recordedInputs": [
+    {
+      "file": "recorded-native-swaps.json",
+      "sourceCommit": "b996a68daddfb89c06a2f1edab8bfc23bd401efc",
+      "sourcePath": "test/fixtures/pons-activity-testnet-native-swaps.json",
+      "sha256": "2114e554b06967171d6a5945bcfd296392df04227b26f74f51e46c2ceef6e963"
+    },
+    {
+      "file": "recorded-graduation-block.json",
+      "sourceCommit": "78ad438078575f9d518b9a9e14b0469578af0c56",
+      "sourcePath": "fixtures/real-46630-graduation-block.json",
+      "sha256": "42922c84341fab3f00cc550d8678a27886b05dcb947f9a8c07c98e0b82b29ff7"
+    }
+  ],
+  "oracleSourceCommit": "e87371df991ab6ebacc1468e13126e53779c8a5f",
+  "oracleFiles": [
+    "packages/sdk/src/receipt-proof.ts",
+    "packages/sdk/src/ethereum-state-proof.ts"
+  ],
+  "oracleViem": "2.56.1"
+}

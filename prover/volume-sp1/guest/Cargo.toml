@@ -1,0 +1,10 @@
+[package]
+name = "volume-chunk-guest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+sp1-zkvm = "=6.7.0"
+kai-volume-chunk = { path = "../chunk" }

@@ -1,7 +1,6 @@
 # Dependencies and source notices
 
-- `sha3 = 0.10.8`: RustCrypto, MIT OR Apache-2.0. Used as Ethereum `Keccak256`, not FIPS SHA3-256.
-- Transitive hashing dependencies (`digest`, `crypto-common`, `block-buffer`, `keccak`, `generic-array`, `typenum`, build/target helpers): exact versions/checksums in Cargo.lock; preserve upstream license notices in distributions.
+- Hashing now uses the sibling `kai-volume-primitives` crate and exact SP1-patched `tiny-keccak 2.0.2` (CC0-1.0), revision `957430a459f7a2332ab5bab4a12f9b473bb95c87`. All original independent Keccak/ABI/header vectors are retained. See the workspace THIRD_PARTY_NOTICES.md and Cargo.lock.
 - Test-only `serde_json = 1.0.149`: MIT OR Apache-2.0; exact transitive versions/checksums in Cargo.lock.
 - Vector generator uses the existing `viem = 2.56.1` (MIT). It is not a Rust runtime dependency and is not vendored here.
 - Adapted project RLP/ABI/V4 source: Apache-2.0, Copyright2026 Alpha Tech Organization. Exact revisions and blobs are recorded in SOURCE-ORIGINS.json.
