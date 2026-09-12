@@ -1,0 +1,72 @@
+{
+  "release": "0.1.0-eval.20260912c",
+  "publicBase": "6da6420e9f82aa7946fe267bee2d2eb3365f3c8a",
+  "sp1Experiment": "e87371df991ab6ebacc1468e13126e53779c8a5f",
+  "copiedSources": [
+    {
+      "commit": "4aba8762abf2144ccc3f1c29039ef4d634bfe074",
+      "path": "experiments/complete-race-proof/volume-trie/src/lib.rs",
+      "gitBlob": "8cb4e9231e200ccac64d09a51da427885719690b",
+      "sha256": "db07d60deecfad34a80dc74b3b37a632d70781b3fe21f64bf675ea7a3a891111",
+      "license": "Apache-2.0"
+    },
+    {
+      "commit": "4aba8762abf2144ccc3f1c29039ef4d634bfe074",
+      "path": "experiments/complete-race-proof/volume-trie/src/receipts.rs",
+      "gitBlob": "0dc85e2c5a1172ef95c19b0a0f9bb9c41a74aa2a",
+      "sha256": "8dad1954bcaffdab0d08748e770c6d153f6e6ed0e31f99f37b609a3edfbbe6c4",
+      "license": "Apache-2.0"
+    },
+    {
+      "commit": "4aba8762abf2144ccc3f1c29039ef4d634bfe074",
+      "path": "experiments/complete-race-proof/core/src/trie.rs",
+      "gitBlob": "3153763d5a2f6b1b1e3933d864cb515d73ef9f6f",
+      "sha256": "bdf128c89dab522f16924ec4d48a2e0d58a416c8a61783d3a51854c8b2089a7f",
+      "license": "Apache-2.0"
+    },
+    {
+      "commit": "4aba8762abf2144ccc3f1c29039ef4d634bfe074",
+      "path": "experiments/complete-race-proof/volume-trie/tests/lookup.rs",
+      "gitBlob": "d4085cfb1e29cd983246b74f73235c60a0b7a754",
+      "sha256": "06eb5d99a84cfe49f2e14610a1a1a7a34d7def3b66d10d5d64ce4d67639cfe2a",
+      "license": "Apache-2.0"
+    },
+    {
+      "commit": "4aba8762abf2144ccc3f1c29039ef4d634bfe074",
+      "path": "experiments/complete-race-proof/volume-trie/tests/walk.rs",
+      "gitBlob": "5a94bee60650a4f070613e7f6d57249558e09776",
+      "sha256": "0345d59d97fc44f7c2ecb7272efb9f6e03957a41854518e6e036063a748d2b45",
+      "license": "Apache-2.0"
+    }
+  ],
+  "changes": [
+    "Trie source/tests: common-crate imports; one scoped lint allowance retains the original fixed stack Node representation. All original tests/vectors retained.",
+    "Only Item/prefix/item/list/data RLP helpers extracted; append a borrowed list iterator. No secure-key/account/storage or PRICE logic imported.",
+    "Core Keccak delegates to the shared pinned tiny-keccak implementation; original ABI/header/volume test vectors unchanged. Workspace replaces core standalone lock.",
+    "Minimal receipt adapter, framing, driver, guest, build and host are new integration code. No delivered Qwen Rust implementation was available.",
+    "Original trie interface retained as upstream reference; tools requiring the original monorepo are not imported."
+  ],
+  "receiptFixture": {
+    "file": "chunk/fixtures/block-117903561-receipt-decoder-fixture.json",
+    "sha256": "57d32ce2f3c435d7c4cde9e04e442bfc4d3fe0576814f8343e3dff6ca7ba8eb3",
+    "kind": "captured public-chain header/receipts; synthetic diagnostic terms supplied separately"
+  },
+  "dependencies": {
+    "sdk": "6.7.0",
+    "zkvm": "6.7.0",
+    "build": "6.7.0",
+    "circuit": "v6.1.0",
+    "tinyKeccak": {
+      "name": "tiny-keccak",
+      "version": "2.0.2",
+      "revision": "957430a459f7a2332ab5bab4a12f9b473bb95c87",
+      "tree": "7c63d2de7a036bce8316e29a88c1611f70f92db0"
+    },
+    "cargoLockSha256": "a137f1df29a49c2487d28df428c5cb4b232c44ac2e30ab04ba320ce4fc0ecad9",
+    "lockedRegistryArchivesVerified": 521,
+    "archiveBytes": 82203618,
+    "newExternalPackageIdentities": 0,
+    "externalVersionOrChecksumChanges": 0
+  },
+  "history": "Only public-base ancestry fetched. Imported source revisions are provenance identifiers, never Git ancestors."
+}

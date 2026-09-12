@@ -1,0 +1,13 @@
+[package]
+name = "volume-trie"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+kai-volume-primitives = { path = "../primitives" }
+
+[dev-dependencies]
+serde_json.workspace = true
+hex.workspace = true

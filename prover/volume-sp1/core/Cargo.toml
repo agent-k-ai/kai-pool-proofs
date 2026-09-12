@@ -1,0 +1,13 @@
+[package]
+name = "kai-volume-core"
+version.workspace = true
+edition = "2021"
+license = "Apache-2.0"
+description = "Pure ABI, Nitro header and V4 volume primitives; not a proof verifier"
+
+
+[dependencies]
+kai-volume-primitives = { path = "../primitives" }
+
+[dev-dependencies]
+serde_json = "=1.0.149"

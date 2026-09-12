@@ -1,0 +1,15 @@
+[package]
+name = "kai-volume-chunk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+kai-volume-primitives = { path = "../primitives" }
+kai-volume-core = { path = "../core" }
+volume-trie = { path = "../trie" }
+
+[dev-dependencies]
+serde_json.workspace = true
+hex.workspace = true
