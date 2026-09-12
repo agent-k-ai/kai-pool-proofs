@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/agent-k-ai/kai-pool-proofs/schemas/volume-proof-wire.schema.json",
   "title": "VOLUME proof wire schema",
-  "description": "Shared wire contract for the public VOLUME proof library and CLI (task 11300, spec section 6). Owned by Qwen with Halo agreement. Schema version is owned by Qwen; endpoint field/route renames require Qwen sign-off. All block numbers and token amounts are decimal strings (JSON-safe bigints). Addresses are EIP-55 checksummed except inside raceKey, which is lowercase. termsHash is the keccak256 of the RFC 8785 (JCS) canonical JSON encoding of the VolumeTerms object.",
-  "schemaVersion": "1.0.0",
+  "description": "Shared wire contract for the public VOLUME proof library and CLI (task 11300, spec section 6, Root-approved interface decisions 2026-09-12). Owned by Qwen with Halo agreement. The schema version is owned by Qwen; endpoint field/route renames require Qwen sign-off. All block numbers and token amounts are decimal strings (JSON-safe bigints). Addresses are EIP-55 checksummed except inside raceKey, which is lowercase; case variations do not create separate identities. termsHash is the keccak256 of the RFC 8785 (JCS) canonical JSON encoding of the VolumeTerms object only. Mutable observations (credits, balances, readiness) live outside termsHash in TermsObservations and ProofStatus.",
+  "schemaVersion": "1.1.0",
   "$defs": {
     "address": {
       "type": "string",
@@ -17,17 +17,17 @@
     "decimalString": {
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)$",
-      "description": "Non-negative integer, decimal, no leading zeros."
+      "description": "Non-negative integer, decimal, no leading zeros. No hex IDs."
     },
     "blockNumber": {
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)$",
-      "description": "Block number as decimal string."
+      "description": "Block number as decimal string. Never add seconds to a block-number deadline."
     },
     "raceKey": {
       "type": "string",
       "pattern": "^46630:0x[0-9a-f]{40}:(0|[1-9][0-9]*)$",
-      "description": "46630:lowercaseController:decimalRaceId"
+      "description": "46630:lowercaseController:decimalRaceId. The controller is validated as an address then normalized lowercase; the decimal raceId is normalized (no hex)."
     },
     "RaceIdentity": {
       "type": "object",
@@ -78,18 +78,7 @@
         "shortfallBehavior": { "type": ["string", "null"] },
         "zeroCreditReserveDisposition": { "type": ["string", "null"], "description": "F5: where the unused zero-proof reserve returns on normal close and expiry." }
       },
-      "description": "Current funding/closure policy status. Unknown values stay null. Signing and deployment plans reject required unresolved values. An off-chain flag does not restrict a permissionless contract's settlement method."
-    },
-    "RewardReads": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["atBlock", "proverPool", "totalAccepted"],
-      "properties": {
-        "atBlock": { "$ref": "#/$defs/blockNumber" },
-        "proverPool": { "$ref": "#/$defs/decimalString", "description": "V2 controller proverPool(raceId), raw collateral units." },
-        "totalAccepted": { "$ref": "#/$defs/decimalString", "description": "V2 controller totalAccepted(raceId), raw collateral units." }
-      },
-      "description": "Reward contract reads at a named block. These are observations, not entitlements."
+      "description": "Per-race rule/economic parameters that affect verification, admission, or payment. Hashed inside VolumeTerms. Unknown required fields remain null and block dependent signing. If a supposedly bound on-chain rule changes, publish a new termsHash and invalidate old plans."
     },
     "VolumeTerms": {
       "type": "object",
@@ -116,11 +105,10 @@
         "bettingCutoff",
         "proofDeadline",
         "historyWindowBlocks",
-        "policy",
-        "rewardReads"
+        "policy"
       ],
       "properties": {
-        "schemaVersion": { "const": "1.0.0" },
+        "schemaVersion": { "const": "1.1.0" },
         "identity": { "$ref": "#/$defs/RaceIdentity" },
         "adapter": { "$ref": "#/$defs/address", "description": "PonsActivityRaceProofAdapter address. submitSwaps target." },
         "pool": { "$ref": "#/$defs/address", "description": "PonsActivityRacePoolV2 address (bettor deposits/claims, not prover rewards)." },
@@ -153,30 +141,66 @@
         "bettingCutoff": { "$ref": "#/$defs/blockNumber", "description": "Actual betting cutoff: snapshotBlock - 600. Not the adapter's legacy betCloseBlock field." },
         "proofDeadline": { "$ref": "#/$defs/blockNumber", "description": "snapshotBlock + 36000 proof grace. Submit while current <= snapshot + grace." },
         "historyWindowBlocks": { "const": 393168, "description": "Adapter history authentication window. Not a statement of RPC retention." },
-        "policy": { "$ref": "#/$defs/PolicyStatus" },
-        "rewardReads": { "$ref": "#/$defs/RewardReads" }
+        "policy": { "$ref": "#/$defs/PolicyStatus" }
       },
-      "description": "Everything a prover needs to build and check VOLUME proofs for one race, plus the explicit policy status. termsHash = keccak256(JCS(this object))."
+      "description": "Hashed verification terms: every per-race rule/economic parameter that affects verification, admission, or payment. Mutable observations (credits, balances, readiness) are NOT part of this object and NOT part of termsHash. termsHash = keccak256(JCS(this object))."
+    },
+    "RewardReads": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proverPool", "totalAccepted"],
+      "properties": {
+        "proverPool": { "$ref": "#/$defs/decimalString", "description": "V2 controller proverPool(raceId), raw collateral units." },
+        "totalAccepted": { "$ref": "#/$defs/decimalString", "description": "V2 controller totalAccepted(raceId), raw collateral units." }
+      },
+      "description": "Reward contract reads. Observations, not entitlements."
+    },
+    "ReadinessFlags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proofWindowOpen", "adapterLive", "controllerLive"],
+      "properties": {
+        "proofWindowOpen": { "type": "boolean" },
+        "adapterLive": { "type": "boolean", "description": "Adapter runtime code present and matching runtimeCodeHash at atBlock." },
+        "controllerLive": { "type": "boolean" }
+      },
+      "description": "Mutable readiness observations at atBlock. Outside termsHash."
+    },
+    "TermsObservations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "raceKey", "termsHash", "atBlock", "rewardReads", "readiness"],
+      "properties": {
+        "schemaVersion": { "const": "1.1.0" },
+        "raceKey": { "$ref": "#/$defs/raceKey" },
+        "termsHash": { "$ref": "#/$defs/hex" },
+        "atBlock": { "$ref": "#/$defs/blockNumber" },
+        "rewardReads": { "$ref": "#/$defs/RewardReads" },
+        "readiness": { "$ref": "#/$defs/ReadinessFlags" }
+      },
+      "description": "Mutable per-race observations served with the terms. Never hashed into termsHash."
     },
     "WitnessBlockEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["blockHash", "objectHash", "bytes"],
+      "required": ["blockHash", "objectHash", "bytes", "complete"],
       "properties": {
         "blockHash": { "$ref": "#/$defs/hex" },
         "objectHash": { "$ref": "#/$defs/hex", "description": "keccak256 of the ReceiptBlock object served for this block." },
-        "bytes": { "type": "integer", "minimum": 0, "description": "Measured byte size of the served ReceiptBlock." }
+        "bytes": { "type": "integer", "minimum": 0, "description": "Measured byte size of the served ReceiptBlock." },
+        "complete": { "type": "boolean", "description": "False when the receipt list for this block is incomplete. An incomplete receipt makes the block incomplete." }
       }
     },
     "MissingRange": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["from", "to"],
+      "required": ["fromBlock", "toBlock", "reason"],
       "properties": {
-        "from": { "$ref": "#/$defs/blockNumber" },
-        "to": { "$ref": "#/$defs/blockNumber" }
+        "fromBlock": { "$ref": "#/$defs/blockNumber", "description": "Inclusive." },
+        "toBlock": { "$ref": "#/$defs/blockNumber", "description": "Inclusive." },
+        "reason": { "type": "string", "minLength": 1, "description": "Why the range has no served witness." }
       },
-      "description": "Inclusive block range with no served witness."
+      "description": "Inclusive decimal block range with no served witness."
     },
     "WitnessManifest": {
       "type": "object",
@@ -186,24 +210,36 @@
         "raceKey",
         "termsHash",
         "generation",
+        "revision",
+        "recordedAt",
         "canonical",
         "verified",
         "blocks",
         "missingRanges",
+        "retrievalComplete",
+        "coverageScope",
+        "coverageEvidence",
+        "minimumAvailableUntil",
         "availableUntil"
       ],
       "properties": {
-        "schemaVersion": { "const": "1.0.0" },
+        "schemaVersion": { "const": "1.1.0" },
         "raceKey": { "$ref": "#/$defs/raceKey" },
         "termsHash": { "$ref": "#/$defs/hex" },
-        "generation": { "type": "integer", "minimum": 1, "description": "Increments on reorg or re-capture. Reorged generations are invalidated." },
-        "canonical": { "type": "boolean", "description": "Witnesses are served only when canonical AND verified at the serving snapshot." },
+        "generation": { "type": "string", "minLength": 1, "description": "Opaque immutable publication-snapshot ID. Persisted atomically. New verified data can publish new snapshots; append-only updates do NOT invalidate otherwise canonical old snapshots. Reorg or rule changes invalidate affected generations/blocks." },
+        "revision": { "type": "integer", "minimum": 1, "description": "Per-race ordered revision of the publication snapshot." },
+        "recordedAt": { "type": "string", "format": "date-time", "description": "UTC time the snapshot was recorded." },
+        "canonical": { "type": "boolean", "description": "Witnesses are served only when canonical AND verified at the serving snapshot. The server rechecks both at serving time." },
         "verified": { "type": "boolean" },
         "blocks": { "type": "array", "items": { "$ref": "#/$defs/WitnessBlockEntry" } },
         "missingRanges": { "type": "array", "items": { "$ref": "#/$defs/MissingRange" } },
-        "availableUntil": { "type": "string", "format": "date-time", "description": "Public witnesses are retained at least 30 days and never purged while needed by an enabled proof window. Earned on-chain claims do not expire because witnesses are purged." }
+        "retrievalComplete": { "type": "boolean", "description": "Every block in the window was retrieved. Separate from on-chain exhaustive coverage." },
+        "coverageScope": { "enum": ["selected", "exhaustive"], "description": "Explicit coverage status. An empty missingRanges alone must not assert contract-level exhaustive proof." },
+        "coverageEvidence": { "type": ["string", "null"], "description": "Status/pointer of the evidence backing coverageScope. null when only selected coverage is claimed." },
+        "minimumAvailableUntil": { "type": "string", "format": "date-time", "description": "Always served. At least recordedAt + 30 days UTC." },
+        "availableUntil": { "type": ["string", "format": "date-time", "null"], "description": "Nullable while closure is unknown/open. No purge until the on-chain proof window is definitively closed under configured finality, plus 24h after that qualified closure observation. Purging raw witnesses never revokes earned claims; earned claim metadata is retained." }
       },
-      "description": "Paginated witness availability for one race generation."
+      "description": "Paginated witness availability for one race snapshot. Paginated cursors bind raceKey + generation + termsHash; no mixed pages. The client revalidates selected blocks/terms before signing. Active work and reorg investigations pin their snapshots."
     },
     "ReceiptLog": {
       "type": "object",
@@ -232,13 +268,14 @@
     "ReceiptBlock": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "blockHash", "encodedHeader", "receiptsRoot", "receipts"],
+      "required": ["schemaVersion", "blockHash", "encodedHeader", "receiptsRoot", "receipts", "complete"],
       "properties": {
-        "schemaVersion": { "const": "1.0.0" },
+        "schemaVersion": { "const": "1.1.0" },
         "blockHash": { "$ref": "#/$defs/hex" },
         "encodedHeader": { "$ref": "#/$defs/hex", "description": "Fixed 16-field Nitro RLP header encoding. The client recomputes its hash independently." },
         "receiptsRoot": { "$ref": "#/$defs/hex" },
-        "receipts": { "type": "array", "items": { "$ref": "#/$defs/BlockReceipt" }, "description": "Full typed receipt list for the block. eth_getBlockByNumber returns transactions, not receipts: the server uses eth_getBlockReceipts or fetches every transaction receipt." }
+        "receipts": { "type": "array", "items": { "$ref": "#/$defs/BlockReceipt" }, "description": "Full typed receipt list for the block. eth_getBlockByNumber returns transactions, not receipts: the server uses eth_getBlockReceipts or fetches every transaction receipt." },
+        "complete": { "type": "boolean", "description": "False when the receipt list is incomplete." }
       },
       "description": "One canonical, verified block: header, receipts root, and the complete receipt list."
     },
@@ -281,16 +318,42 @@
       "additionalProperties": false,
       "required": ["schemaVersion", "raceKey", "abiDigest", "sourceIdentity", "termsHash", "batches", "costCaps", "txHash"],
       "properties": {
-        "schemaVersion": { "const": "1.0.0" },
+        "schemaVersion": { "const": "1.1.0" },
         "raceKey": { "$ref": "#/$defs/raceKey" },
         "abiDigest": { "$ref": "#/$defs/hex" },
         "sourceIdentity": { "type": "string" },
         "termsHash": { "$ref": "#/$defs/hex" },
         "batches": { "type": "array", "items": { "$ref": "#/$defs/ProofBatch" } },
         "costCaps": { "$ref": "#/$defs/CostCaps" },
-        "txHash": { "type": "null", "description": "Always null in a plan. A plan is prepared state, never a submission." }
+        "txHash": { "type": "null", "description": "Always null in a plan. A plan is prepared state, never a submission. If termsHash changes, the plan is invalid." }
       },
       "description": "One-block SwapProof batches with selected swap ids and raw amounts, plus cost caps. Prepared/calldata hashes stay distinct from real transaction hashes."
+    },
+    "ProofStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "raceKey", "termsHash", "atBlock", "atBlockHash", "source", "observations"],
+      "properties": {
+        "schemaVersion": { "const": "1.1.0" },
+        "raceKey": { "$ref": "#/$defs/raceKey" },
+        "termsHash": { "$ref": "#/$defs/hex" },
+        "atBlock": { "$ref": "#/$defs/blockNumber" },
+        "atBlockHash": { "$ref": "#/$defs/hex" },
+        "source": { "type": "string", "minLength": 1, "description": "Named RPC/history source that produced these chain-confirmed observations." },
+        "observations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["submittedSwaps", "acceptedSwaps", "totalProofCredits", "settled", "invalidated"],
+          "properties": {
+            "submittedSwaps": { "$ref": "#/$defs/decimalString" },
+            "acceptedSwaps": { "$ref": "#/$defs/decimalString" },
+            "totalProofCredits": { "$ref": "#/$defs/decimalString" },
+            "settled": { "type": "boolean" },
+            "invalidated": { "type": "boolean" }
+          }
+        }
+      },
+      "description": "Chain-confirmed observations with block, hash, and source. Serves on-chain state only, never outsiders' local prepared plans."
     },
     "SubmissionReceipt": {
       "type": "object",
@@ -314,28 +377,49 @@
       },
       "description": "Wide uint256 credit movement read via proofCreditsFor before and after the submission."
     },
+    "ClaimRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["txHash", "receiver", "amount", "atBlock", "atBlockHash"],
+      "properties": {
+        "txHash": { "$ref": "#/$defs/hex" },
+        "receiver": { "$ref": "#/$defs/address" },
+        "amount": { "$ref": "#/$defs/decimalString", "description": "ERC20 collateral delta actually received. The claim event lacks a race id: the emitting controller and decoded transaction race id are indexed alongside." },
+        "atBlock": { "$ref": "#/$defs/blockNumber" },
+        "atBlockHash": { "$ref": "#/$defs/hex" }
+      },
+      "description": "A paid claimBounty with the verified receiver collateral balance delta."
+    },
     "Submission": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "raceKey", "txHash", "sender", "to", "receipt", "creditDeltas"],
+      "required": ["schemaVersion", "raceKey", "state", "calldataHash", "txHash", "sender", "to", "receipt", "creditDeltas", "claim"],
       "properties": {
-        "schemaVersion": { "const": "1.0.0" },
+        "schemaVersion": { "const": "1.1.0" },
         "raceKey": { "$ref": "#/$defs/raceKey" },
-        "txHash": { "$ref": "#/$defs/hex", "description": "Actual mined transaction hash. A DB enqueue, local test, synthetic hash, or PENDING_BROADCAST state is not a submission." },
+        "state": {
+          "enum": ["prepared", "broadcast", "confirmed", "credit_accepted", "claim_paid"],
+          "description": "Local submission state machine. prepared: calldata hash only, NO txHash. broadcast: real returned hash. confirmed: receipt checked. credit_accepted: accepted credit deltas verified. claim_paid: paid claim verified."
+        },
+        "calldataHash": { "$ref": "#/$defs/hex", "description": "keccak256 of the prepared calldata. Kept for traceability in every state. Distinct from any real transaction hash." },
+        "txHash": { "type": ["string", "null"], "pattern": "^0x[0-9a-fA-F]{64}$", "description": "null while prepared. The actual returned/mined transaction hash from broadcast onward." },
         "sender": { "$ref": "#/$defs/address" },
         "to": { "$ref": "#/$defs/address", "description": "Adapter destination." },
-        "receipt": { "$ref": "#/$defs/SubmissionReceipt" },
-        "creditDeltas": { "type": "array", "items": { "$ref": "#/$defs/CreditDelta" } }
+        "receipt": { "anyOf": [{ "$ref": "#/$defs/SubmissionReceipt" }, { "type": "null" }], "description": "null until confirmed. A failed receipt (status 0) is recorded so the atomic revert is visible." },
+        "creditDeltas": { "type": "array", "items": { "$ref": "#/$defs/CreditDelta" } },
+        "claim": { "anyOf": [{ "$ref": "#/$defs/ClaimRecord" }, { "type": "null" }] }
       },
-      "description": "Confirmed submission: real tx hash, canonical receipt, and the accepted credit deltas. SwapProven/ActivityTally events and exact deltas are checked before this object is written."
+      "description": "Local submission record across the full state machine. A DB enqueue, local test, synthetic hash, or PENDING_BROADCAST state is not a submission: only broadcast onward carries a real tx hash."
     }
   },
   "oneOf": [
     { "$ref": "#/$defs/RaceIdentity" },
     { "$ref": "#/$defs/VolumeTerms" },
+    { "$ref": "#/$defs/TermsObservations" },
     { "$ref": "#/$defs/WitnessManifest" },
     { "$ref": "#/$defs/ReceiptBlock" },
     { "$ref": "#/$defs/ProofPlan" },
+    { "$ref": "#/$defs/ProofStatus" },
     { "$ref": "#/$defs/Submission" }
   ]
 }

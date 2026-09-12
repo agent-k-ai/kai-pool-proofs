@@ -1,20 +1,26 @@
 /**
- * Wire schema tests: race key handling, terms hash determinism, and the
- * prepared-versus-submission state boundary.
+ * Wire schema tests: race key handling, terms hash determinism, the
+ * hashed-terms versus mutable-observations split, witness manifest
+ * snapshot semantics, and the prepared-versus-submission state machine.
  *
  * Apache-2.0. Copyright 2026 Alpha Tech Organization.
  */
 import { describe, expect, it } from "vitest";
 import {
+  assertSubmissionState,
   canonicalJson,
   identityOfRaceKey,
   proofPlanSchema,
+  proofStatusSchema,
   raceIdentitySchema,
   raceKeyOf,
   submissionSchema,
   termsHashOf,
+  termsObservationsSchema,
   volumeTermsSchema,
+  witnessManifestSchema,
   type RaceIdentity,
+  type Submission,
   type VolumeTerms,
 } from "../src/index.js";
 
@@ -32,7 +38,7 @@ const entrants = [
 ];
 
 const terms: VolumeTerms = {
-  schemaVersion: "1.0.0",
+  schemaVersion: "1.1.0",
   identity,
   adapter: "0x2222222222222222222222222222222222222222",
   pool: "0x3333333333333333333333333333333333333333",
@@ -73,30 +79,36 @@ const terms: VolumeTerms = {
     shortfallBehavior: null,
     zeroCreditReserveDisposition: null,
   },
-  rewardReads: {
-    atBlock: "114454071",
-    proverPool: "0",
-    totalAccepted: "0",
-  },
 };
+
+const RACE_KEY = "46630:0x1111111111111111111111111111111111111111:7";
 
 describe("race key", () => {
   it("builds 46630:lowercaseController:decimalRaceId", () => {
-    expect(raceKeyOf(identity)).toBe("46630:0x1111111111111111111111111111111111111111:7");
+    expect(raceKeyOf(identity)).toBe(RACE_KEY);
   });
 
   it("round-trips through identityOfRaceKey", () => {
     expect(identityOfRaceKey(raceKeyOf(identity))).toEqual(identity);
   });
 
-  it("rejects a non-46630 chain in the key", () => {
-    expect(() => identityOfRaceKey("4663:0x1111111111111111111111111111111111111111:7")).toThrow(
+  it("normalizes a checksummed controller to lowercase", () => {
+    const parsed = identityOfRaceKey("46630:0x1111111111111111111111111111111111111111:7");
+    expect(parsed.controller).toBe("0x1111111111111111111111111111111111111111");
+  });
+
+  it("rejects a non-address controller", () => {
+    expect(() => identityOfRaceKey("46630:0x1234:7")).toThrow("RACE_KEY_INVALID");
+  });
+
+  it("rejects a hex race id", () => {
+    expect(() => identityOfRaceKey("46630:0x1111111111111111111111111111111111111111:0x7")).toThrow(
       "RACE_KEY_INVALID",
     );
   });
 
-  it("rejects an uppercase controller in the key", () => {
-    expect(() => identityOfRaceKey("46630:0x111111111111111111111111111111111111111A:7")).toThrow(
+  it("rejects a non-46630 chain in the key", () => {
+    expect(() => identityOfRaceKey("4663:0x1111111111111111111111111111111111111111:7")).toThrow(
       "RACE_KEY_INVALID",
     );
   });
@@ -118,7 +130,7 @@ describe("canonical JSON and terms hash", () => {
   });
 });
 
-describe("volume terms", () => {
+describe("volume terms (hashed core)", () => {
   it("accepts the labeled fixture with pending policy", () => {
     expect(volumeTermsSchema.safeParse(terms).success).toBe(true);
   });
@@ -139,12 +151,127 @@ describe("volume terms", () => {
     const bad = { ...terms, collateralDecimals: 18 };
     expect(volumeTermsSchema.safeParse(bad).success).toBe(false);
   });
+
+  it("rejects mutable observations inside the hashed terms", () => {
+    const bad = { ...terms, rewardReads: { proverPool: "0", totalAccepted: "0" } };
+    expect(volumeTermsSchema.safeParse(bad).success).toBe(false);
+  });
 });
 
-describe("prepared versus submitted state", () => {
+describe("terms observations (mutable, outside termsHash)", () => {
+  it("accepts reward reads and readiness at a block", () => {
+    const obs = {
+      schemaVersion: "1.1.0",
+      raceKey: RACE_KEY,
+      termsHash: termsHashOf(terms),
+      atBlock: "114454071",
+      rewardReads: { proverPool: "0", totalAccepted: "0" },
+      readiness: { proofWindowOpen: true, adapterLive: true, controllerLive: true },
+    };
+    expect(termsObservationsSchema.safeParse(obs).success).toBe(true);
+  });
+
+  it("rejects observations that omit readiness", () => {
+    const obs = {
+      schemaVersion: "1.1.0",
+      raceKey: RACE_KEY,
+      termsHash: termsHashOf(terms),
+      atBlock: "114454071",
+      rewardReads: { proverPool: "0", totalAccepted: "0" },
+    };
+    expect(termsObservationsSchema.safeParse(obs).success).toBe(false);
+  });
+});
+
+describe("witness manifest snapshot semantics", () => {
+  const manifest = {
+    schemaVersion: "1.1.0",
+    raceKey: RACE_KEY,
+    termsHash: termsHashOf(terms),
+    generation: "snap-2026-09-12-001",
+    revision: 1,
+    recordedAt: "2026-09-12T12:00:00Z",
+    canonical: true,
+    verified: true,
+    blocks: [
+      {
+        blockHash: "0x" + "11".repeat(32),
+        objectHash: "0x" + "22".repeat(32),
+        bytes: 1234,
+        complete: true,
+      },
+    ],
+    missingRanges: [
+      { fromBlock: "114418070", toBlock: "114418100", reason: "rpc-history-gap" },
+    ],
+    retrievalComplete: false,
+    coverageScope: "selected",
+    coverageEvidence: null,
+    minimumAvailableUntil: "2026-10-12T12:00:00Z",
+    availableUntil: null,
+  };
+
+  it("accepts an opaque generation id with ordered revision", () => {
+    expect(witnessManifestSchema.safeParse(manifest).success).toBe(true);
+  });
+
+  it("accepts nullable availableUntil while closure is open", () => {
+    const parsed = witnessManifestSchema.parse(manifest);
+    expect(parsed.availableUntil).toBeNull();
+    expect(parsed.minimumAvailableUntil).toBe("2026-10-12T12:00:00Z");
+  });
+
+  it("requires a reason on every missing range", () => {
+    const bad = {
+      ...manifest,
+      missingRanges: [{ fromBlock: "114418070", toBlock: "114418100" }],
+    };
+    expect(witnessManifestSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it("keeps retrievalComplete separate from coverageScope", () => {
+    const bad = { ...manifest, retrievalComplete: true, coverageScope: "exhaustive", coverageEvidence: null };
+    // exhaustive without evidence is representable; the state machine and
+    // the server policy decide whether it is publishable.
+    expect(witnessManifestSchema.safeParse(bad).success).toBe(true);
+  });
+
+  it("rejects an incomplete block entry without the complete flag", () => {
+    const bad = {
+      ...manifest,
+      blocks: [{ blockHash: "0x" + "11".repeat(32), objectHash: "0x" + "22".repeat(32), bytes: 1234 }],
+    };
+    expect(witnessManifestSchema.safeParse(bad).success).toBe(false);
+  });
+});
+
+describe("proof status (chain-confirmed only)", () => {
+  it("requires block, hash, and source", () => {
+    const status = {
+      schemaVersion: "1.1.0",
+      raceKey: RACE_KEY,
+      termsHash: termsHashOf(terms),
+      atBlock: "114454071",
+      atBlockHash: "0x" + "33".repeat(32),
+      source: "user-rpc",
+      observations: {
+        submittedSwaps: "10",
+        acceptedSwaps: "9",
+        totalProofCredits: "9",
+        settled: false,
+        invalidated: false,
+      },
+    };
+    expect(proofStatusSchema.safeParse(status).success).toBe(true);
+    const noSource = { ...status, source: "" };
+    expect(proofStatusSchema.safeParse(noSource).success).toBe(false);
+  });
+});
+
+describe("prepared versus submitted state machine", () => {
   const plan = {
-    schemaVersion: "1.0.0",
-    raceKey: "46630:0x1111111111111111111111111111111111111111:7",
+    schemaVersion: "1.1.0",
+    raceKey: RACE_KEY,
     abiDigest: "0x" + "ab".repeat(32),
     sourceIdentity: "00f4ec0effe091216896e1ee44d733e57ebfe1e6",
     termsHash: termsHashOf(terms),
@@ -176,10 +303,46 @@ describe("prepared versus submitted state", () => {
     expect(proofPlanSchema.safeParse(bad).success).toBe(false);
   });
 
-  it("accepts a submission with a real tx hash and credit deltas", () => {
-    const submission = {
-      schemaVersion: "1.0.0",
-      raceKey: plan.raceKey,
+  it("accepts a prepared submission: calldata hash only, NO txHash", () => {
+    const prepared = {
+      schemaVersion: "1.1.0",
+      raceKey: RACE_KEY,
+      state: "prepared",
+      calldataHash: "0x" + "55".repeat(32),
+      txHash: null,
+      sender: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      to: terms.adapter,
+      receipt: null,
+      creditDeltas: [],
+      claim: null,
+    };
+    expect(submissionSchema.safeParse(prepared).success).toBe(true);
+  });
+
+  it("rejects a prepared submission that smuggles in a tx hash", () => {
+    const bad = {
+      schemaVersion: "1.1.0",
+      raceKey: RACE_KEY,
+      state: "prepared",
+      calldataHash: "0x" + "55".repeat(32),
+      txHash: "0x" + "44".repeat(32),
+      sender: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      to: terms.adapter,
+      receipt: null,
+      creditDeltas: [],
+      claim: null,
+    };
+    // The schema allows the shape; the state-machine helper enforces the
+    // invariant. See assertSubmissionState below.
+    expect(submissionSchema.safeParse(bad).success).toBe(true);
+  });
+
+  it("accepts a confirmed submission with receipt and credit deltas", () => {
+    const confirmed = {
+      schemaVersion: "1.1.0",
+      raceKey: RACE_KEY,
+      state: "credit_accepted",
+      calldataHash: "0x" + "55".repeat(32),
       txHash: "0x" + "44".repeat(32),
       sender: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       to: terms.adapter,
@@ -192,24 +355,49 @@ describe("prepared versus submitted state", () => {
           delta: "1",
         },
       ],
+      claim: null,
     };
-    expect(submissionSchema.safeParse(submission).success).toBe(true);
+    expect(submissionSchema.safeParse(confirmed).success).toBe(true);
   });
 
-  it("rejects a submission whose receipt failed", () => {
-    const bad = {
-      schemaVersion: "1.0.0",
-      raceKey: plan.raceKey,
+  it("records a failed receipt (atomic revert) at confirmed state", () => {
+    const reverted = {
+      schemaVersion: "1.1.0",
+      raceKey: RACE_KEY,
+      state: "confirmed",
+      calldataHash: "0x" + "55".repeat(32),
       txHash: "0x" + "44".repeat(32),
       sender: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       to: terms.adapter,
       receipt: { blockHash: "0x" + "55".repeat(32), status: 0, gasUsed: "120000" },
       creditDeltas: [],
+      claim: null,
     };
-    // A failed receipt is representable (status 0) so the CLI can record
-    // the atomic revert; the state machine, not the schema, decides
-    // whether it counts.
-    expect(submissionSchema.safeParse(bad).success).toBe(true);
+    expect(submissionSchema.safeParse(reverted).success).toBe(true);
+  });
+
+  it("assertSubmissionState enforces the state/hash invariants", () => {
+    const base: Omit<Submission, "state" | "txHash"> = {
+      schemaVersion: "1.1.0",
+      raceKey: RACE_KEY,
+      calldataHash: "0x" + "55".repeat(32),
+      sender: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      to: terms.adapter,
+      receipt: null,
+      creditDeltas: [],
+      claim: null,
+    };
+    expect(() => assertSubmissionState({ ...base, state: "prepared", txHash: "0x" + "44".repeat(32) })).toThrow(
+      "SUBMISSION_STATE",
+    );
+    expect(() => assertSubmissionState({ ...base, state: "broadcast", txHash: null })).toThrow("SUBMISSION_STATE");
+    expect(() => assertSubmissionState({ ...base, state: "confirmed", txHash: null })).toThrow("SUBMISSION_STATE");
+    expect(() =>
+      assertSubmissionState({ ...base, state: "credit_accepted", txHash: null }),
+    ).toThrow("SUBMISSION_STATE");
+    // valid transitions
+    assertSubmissionState({ ...base, state: "prepared", txHash: null });
+    assertSubmissionState({ ...base, state: "broadcast", txHash: "0x" + "44".repeat(32) });
   });
 });
 

@@ -42,15 +42,43 @@ pnpm-lock.yaml provenance/       # exact source/dependency/build mapping
 
 `schemas/volume-proof-wire.schema.json` (JSON Schema 2020-12) and
 `packages/volume-proof/src/schema.ts` (zod + types) define the shared wire
-contract: `RaceIdentity`, `VolumeTerms`, `WitnessManifest`, `ReceiptBlock`,
-`ProofPlan`, `Submission`.
+contract (version 1.1.0): `RaceIdentity`, `VolumeTerms`,
+`TermsObservations`, `WitnessManifest`, `ReceiptBlock`, `ProofPlan`,
+`ProofStatus`, `Submission`.
 
-- `raceKey = "46630:lowercaseController:decimalRaceId"`
-- `termsHash = keccak256(RFC 8785 canonical JSON of VolumeTerms)`
+- `raceKey = "46630:lowercaseController:decimalRaceId"`. The controller is
+  validated as an address, then normalized lowercase; the decimal raceId is
+  normalized (no hex). Case variations do not create separate identities.
+- `termsHash = keccak256(RFC 8785 canonical JSON of VolumeTerms)`. The
+  hashed terms contain every per-race rule/economic parameter that affects
+  verification, admission, or payment. Mutable observations (credits,
+  balances, readiness) live outside termsHash in `TermsObservations` and
+  `ProofStatus`. If a supposedly bound on-chain rule changes, publish a new
+  termsHash and invalidate old plans.
+- `WitnessManifest.generation` is an opaque immutable publication-snapshot
+  ID with a per-race ordered `revision`. Append-only updates do not
+  invalidate otherwise canonical old snapshots; reorg or rule changes do.
+  Paginated cursors bind raceKey + generation + termsHash; no mixed pages.
+- `missingRanges` are inclusive `{fromBlock, toBlock, reason}`. An
+  incomplete receipt makes the block incomplete (`complete: false`).
+  `retrievalComplete` is separate from on-chain exhaustive coverage:
+  `coverageScope` is explicit (`selected` | `exhaustive`) with
+  `coverageEvidence`. An empty missingRanges alone must not assert
+  contract-level exhaustive proof.
+- Retention: `minimumAvailableUntil` is always served (at least
+  recordedAt + 30 days UTC); `availableUntil` is nullable while closure is
+  unknown/open. No purge until the on-chain proof window is definitively
+  closed under configured finality, plus 24h after that qualified closure
+  observation. Purging raw witnesses never revokes earned claims.
 - `ProofPlan.txHash` is always `null`; a plan is prepared state, never a
   submission.
-- `Submission` carries the actual mined tx hash, canonical receipt, and
-  accepted credit deltas.
+- `ProofStatus` serves chain-confirmed observations with block, hash, and
+  source. It never serves outsiders' local prepared plans.
+- `Submission` is a local state machine:
+  `prepared` (calldata hash only, NO txHash) -> `broadcast` (real returned
+  hash) -> `confirmed` (receipt checked) -> `credit_accepted` (accepted
+  credit deltas verified) -> `claim_paid` (paid claim verified).
+  `assertSubmissionState` enforces the invariants.
 - The schema version is owned by the schema owner; endpoint field/route
   renames require that sign-off.
 
@@ -63,9 +91,17 @@ GET /api/v1/activity/races/{chain}/{controller}/{race}/witnesses/blocks/{blockHa
 GET /api/v1/activity/races/{chain}/{controller}/{race}/proof-status
 ```
 
-Witnesses are served only when canonical AND verified at the serving
-snapshot. Reorged generations are invalidated. The client revalidates
-before signing.
+- `proof-terms` returns the hashed `VolumeTerms`, `termsHash`, and the
+  mutable `TermsObservations`.
+- `proof-status` returns `ProofStatus`: chain-confirmed observations with
+  block, hash, and source.
+- Witnesses are served only when canonical AND verified at the serving
+  snapshot. The server rechecks both at serving time. Reorged or
+  rule-invalidated generations/blocks are not served. The client
+  revalidates selected blocks/terms before signing.
+- Server storage uses an isolated versioned full-race-key projection;
+  historical controller ownership in legacy rows is not guessed. PRICE
+  tables are not automatically required.
 
 ## CLI (proposed)
 
