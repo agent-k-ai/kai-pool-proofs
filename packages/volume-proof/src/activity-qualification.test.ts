@@ -41,7 +41,18 @@ function v4Log(amount0: bigint, amount1: bigint, poolId: Hex, sender: Address) {
       poolId,
       `0x${sender.slice(2).padStart(64, "0")}` as Hex,
     ],
-    data: encodeAbiParameters([{ type: "int128" }, { type: "int128" }], [amount0, amount1]),
+    // Full production data length: six words (192 bytes).
+    data: encodeAbiParameters(
+      [
+        { type: "int128" },
+        { type: "int128" },
+        { type: "uint160" },
+        { type: "uint128" },
+        { type: "int24" },
+        { type: "uint24" },
+      ],
+      [amount0, amount1, 7_923_485_200_305_140_259n, 100_000n, 0, 2_000_000],
+    ),
   };
 }
 
@@ -53,7 +64,17 @@ function v3Log(pool: Address, amount0: bigint, amount1: bigint, sender: Address)
       `0x${sender.slice(2).padStart(64, "0")}` as Hex,
       `0x${sender.slice(2).padStart(64, "0")}` as Hex,
     ],
-    data: encodeAbiParameters([{ type: "int256" }, { type: "int256" }], [amount0, amount1]),
+    // Full production data length: five words (160 bytes).
+    data: encodeAbiParameters(
+      [
+        { type: "int256" },
+        { type: "int256" },
+        { type: "uint160" },
+        { type: "uint128" },
+        { type: "int24" },
+      ],
+      [amount0, amount1, 7_923_485_200_305_140_259n, 100_000n, 0],
+    ),
   };
 }
 
@@ -82,6 +103,20 @@ describe("swap log decoding", () => {
     const log = v4Log(1n, 1n, `0x${"ab".repeat(32)}`, SENDER);
     log.topics = [`0x${"00".repeat(32)}`, log.topics[1], log.topics[2]];
     expect(() => decodeV4SwapLog(log)).toThrow("ACTIVITY_SWAP_LOG_INVALID");
+  });
+
+  it("rejects a V4 log with a truncated data length", () => {
+    const poolId = activityPoolId(KEY);
+    const log = v4Log(1n, 1n, poolId, SENDER);
+    log.data = encodeAbiParameters([{ type: "int128" }, { type: "int128" }], [1n, 1n]);
+    expect(() => decodeV4SwapLog(log)).toThrow("ACTIVITY_SWAP_DATA_LENGTH");
+  });
+
+  it("rejects a V3 log with a truncated data length", () => {
+    const pool = "0x3333333333333333333333333333333333333333" as Address;
+    const log = v3Log(pool, 1n, 1n, SENDER);
+    log.data = encodeAbiParameters([{ type: "int256" }, { type: "int256" }], [1n, 1n]);
+    expect(() => decodeV3SwapLog(log)).toThrow("ACTIVITY_SWAP_DATA_LENGTH");
   });
 
   it("derives the V4 pool id from the pool key", () => {
@@ -125,6 +160,7 @@ describe("venue qualification", () => {
     const q = qualifyActivitySwap({
       entrants,
       metric: 1,
+      wrapper: WETH,
       raceQuoteAsset: WETH,
       minNotional,
       poolKey: KEY,
@@ -145,6 +181,7 @@ describe("venue qualification", () => {
     const q = qualifyActivitySwap({
       entrants,
       metric: 1,
+      wrapper: WETH,
       raceQuoteAsset: WETH,
       minNotional,
       poolKey: KEY,
@@ -162,6 +199,7 @@ describe("venue qualification", () => {
     const q = qualifyActivitySwap({
       entrants,
       metric: 1,
+      wrapper: WETH,
       raceQuoteAsset: WETH,
       minNotional,
       poolKey: KEY,
@@ -178,6 +216,7 @@ describe("venue qualification", () => {
     const q = qualifyActivitySwap({
       entrants,
       metric: 2,
+      wrapper: WETH,
       minNotional,
       poolKey: KEY,
       swap,
@@ -191,6 +230,7 @@ describe("venue qualification", () => {
     const q = qualifyActivitySwap({
       entrants,
       metric: 2,
+      wrapper: WETH,
       minNotional,
       poolKey: KEY,
       swap,
@@ -205,6 +245,7 @@ describe("venue qualification", () => {
     const q = qualifyActivitySwap({
       entrants,
       metric: 1,
+      wrapper: WETH,
       raceQuoteAsset: WETH,
       minNotional,
       poolKey: KEY,
@@ -221,6 +262,7 @@ describe("venue qualification", () => {
     const q = qualifyActivitySwap({
       entrants,
       metric: 1,
+      wrapper: WETH,
       raceQuoteAsset: WETH,
       minNotional,
       poolKey: otherKey,
@@ -235,6 +277,7 @@ describe("venue qualification", () => {
     const q2 = qualifyActivitySwap({
       entrants,
       metric: 1,
+      wrapper: WETH,
       raceQuoteAsset: WETH,
       minNotional,
       poolKey: noEntrant,
@@ -253,9 +296,53 @@ describe("venue qualification", () => {
     const q = qualifyActivitySwap({
       entrants,
       metric: 1,
+      wrapper: WETH,
       raceQuoteAsset: WETH,
       minNotional: { [usdc]: 0n },
       poolKey: key,
+      swap,
+    });
+    expect(q).toBeNull();
+  });
+
+  it("maps a zero-currency native venue to the wrapper quote", () => {
+    const zero = "0x0000000000000000000000000000000000000000" as Address;
+    const nativeKey: ActivityPoolKey = { ...KEY, currency1: zero };
+    const poolId = activityPoolId(nativeKey);
+    // The pool id keeps the raw zero currency in its hash input.
+    expect(poolId).not.toBe(activityPoolId(KEY));
+    // Caller buys TOKEN_A: receives token (amount0 > 0), spends native (amount1 < 0).
+    const swap = decodeV4SwapLog(v4Log(1_000n, -2_000n, poolId, SENDER));
+    const q = qualifyActivitySwap({
+      entrants,
+      metric: 1,
+      wrapper: WETH,
+      raceQuoteAsset: WETH,
+      minNotional,
+      poolKey: nativeKey,
+      swap,
+    });
+    if (q === null) throw new Error("expected native qualification");
+    expect(q.entrantIndex).toBe(0);
+    expect(q.quoteAsset).toBe(WETH);
+    expect(q.quoteAmount).toBe(2_000n);
+    expect(q.tokenIsOutput).toBe(true);
+  });
+
+  it("keeps the raw zero in the native pool key and rejects a wrong race quote", () => {
+    const zero = "0x0000000000000000000000000000000000000000" as Address;
+    const nativeKey: ActivityPoolKey = { ...KEY, currency1: zero };
+    const poolId = activityPoolId(nativeKey);
+    const swap = decodeV4SwapLog(v4Log(1_000n, -2_000n, poolId, SENDER));
+    // A race quoted in WETH cannot be satisfied by a different wrapper.
+    const otherWrapper = "0x4444444444444444444444444444444444444444" as Address;
+    const q = qualifyActivitySwap({
+      entrants,
+      metric: 1,
+      wrapper: otherWrapper,
+      raceQuoteAsset: WETH,
+      minNotional,
+      poolKey: nativeKey,
       swap,
     });
     expect(q).toBeNull();

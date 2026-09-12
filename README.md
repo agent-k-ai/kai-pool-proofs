@@ -7,6 +7,9 @@ An outsider who is not the race creator fetches public canonical and
 verified witnesses, uses their own RPC and funded signer, constructs
 receipt proofs, broadcasts `submitSwaps`, confirms the receipt, and
 reconciles accepted quote deltas and wide credits for all four entrants.
+This is the receipt-stage capture and diagnostics path; the settled spec
+makes the final paid volume node a succinct SP1 proof, and this repository
+is its supporting tooling, not the final prover.
 
 This repository is the public proof-code destination. The parent
 application remains a private repository; the public build never requires
@@ -18,14 +21,22 @@ License: Apache-2.0. See `LICENSE`, `NOTICE`, and
 
 ## Status
 
-C0 checkpoint (task 11300): wire schema, license/provenance, and package
-layout are in place. Header/receipt verification, venue qualification,
-Swap batch building, and the CLI follow in this branch. D1 (staging/
-closure) and D2 (pool-funded rewards) are user decisions that stay
-explicit and unresolved in the schema (`policy.decisionStatus = "pending"`,
-unknown values null). No creator-prefunding is implemented and no
-completeness is claimed: a C1 run proves selected authentic receipt
-inclusion and credit accounting, not exhaustive volume.
+C1 checkpoint (task 11300): the pure library (header/receipt verification,
+venue qualification, receipt capture, Swap batch building) and the CLI are
+implemented with portable tests. The wire schema (Astra-owned) is committed
+at digest `3d97d8d`. D1 (staging/closure) and D2 (pool-funded rewards) are
+user decisions that stay explicit and unresolved in the schema
+(`policy.decisionStatus = "pending"`, unknown values null). No
+creator-prefunding is implemented and no completeness is claimed: a C1 run
+proves selected authentic receipt inclusion and credit accounting, not
+exhaustive volume. No live signing yet: submit/confirm/claim are implemented
+against an injected signer and wait on the review gate.
+
+Role under the settled spec: this repository is **supporting
+capture/validation/diagnostics** for the VOLUME race. The final paid volume
+node is a **succinct SP1 proof** (receipts read through the receipt trie to
+proven exhaustion), not per-swap `submitSwaps` submission. This code does not
+claim to be the final prover.
 
 ## Layout
 
@@ -103,50 +114,71 @@ GET /api/v1/activity/races/{chain}/{controller}/{race}/proof-status
   historical controller ownership in legacy rows is not guessed. PRICE
   tables are not automatically required.
 
-## CLI (proposed)
+## CLI
 
 ```text
-volume-proof inspect --race 46630:CONTROLLER:RACE --config ./public-config.json
-volume-proof fetch   --race 46630:CONTROLLER:RACE --config ./public-config.json --out ./witnesses/
-volume-proof verify  --race 46630:CONTROLLER:RACE --config ./public-config.json --witnesses ./witnesses/
-volume-proof plan    --race 46630:CONTROLLER:RACE --config ./public-config.json --witnesses ./witnesses/ --out ./plan.json
-volume-proof submit  --plan ./plan.json --config ./public-config.json
-volume-proof confirm --plan ./plan.json --config ./public-config.json
-volume-proof rewards --race 46630:CONTROLLER:RACE --config ./public-config.json
-volume-proof claim   --race 46630:CONTROLLER:RACE --config ./public-config.json
+volume-proof inspect --config cfg.json --race 46630:0xC:1
+volume-proof fetch   --config cfg.json --block 123
+volume-proof verify  --config cfg.json --file captured.json [--proofs 0:0,1:2]
+volume-proof plan    --config cfg.json --file captured.json --spec spec.json [--race 46630:0xC:1]
+volume-proof rewards --config cfg.json --race 46630:0xC:1 --prover 0xP
+volume-proof submit  --config cfg.json --race 46630:0xC:1 --plan plan.json --entrants '["0xA","0xB"]' --gas-price 1000000000
+volume-proof confirm --config cfg.json --tx 0xH --adapter 0xA
+volume-proof claim   --config cfg.json --race 46630:0xC:1 --receiver 0xR --gas-price 1000000000
 ```
+
+Output is JSON on stdout; errors are JSON on stderr with a non-zero exit
+code. `fetch` captures one block's header and receipts from the user's own
+RPC and verifies the receipts root before printing. `plan` builds Swap
+proofs and batches offline (state `prepared`, `txHash: null`). `submit`
+signs and broadcasts one batch (state `broadcast`, real returned hash).
+`confirm` reads the canonical receipt and decodes `SwapProven` (state
+`confirmed`). With `--race`, `plan` first verifies every candidate's quote
+asset against the on-chain `entrantQuoteAsset` view; the raw zero address
+(native venue) is compared as-is and never normalized to a wrapper. The
+witness manifest HTTP endpoint is integrated when the server rollout
+lands; until then the CLI captures direct from own RPC.
 
 Config file (`public-config.json`), all values supplied by the user:
 
 ```json
 {
-  "rpcUrl": "https://user-provided-rpc",
-  "witnessApiUrl": "https://public-witness-api",
-  "wallet": { "kind": "keystore", "path": "./wallet/keystore.json" },
-  "spendCapNative": "0.01"
+  "rpcUrls": ["https://user-provided-rpc"],
+  "chainId": 46630,
+  "keystorePath": "./wallet/keystore.json",
+  "spendCapWei": "10000000000000",
+  "adapter": "0x..."
 }
 ```
 
 Rules:
 
-- Signer selection is a local keystore or external wallet. A raw key is
-  never passed in CLI arguments or transmitted to the witness API.
+- Signer selection is a local keystore (Web3 Secret Storage V3) only. The
+  passphrase comes from the `VOLUME_PROOF_PASSPHRASE` environment variable;
+  a raw key is never passed in CLI arguments.
 - The user's RPC must report chain `46630`; the CLI refuses otherwise.
-- Explicit spend caps, refreshed before signing. No fallback to an
-  operator endpoint or key.
+- Explicit spend caps, checked before signing. No fallback to an operator
+  endpoint or key.
 - The header hash and receipt root are reconstructed independently.
   Canonicality is authenticated through the user's own RPC/history source.
 - `eth_getBlockByNumber` returns transactions, not receipts: the CLI uses
   `eth_getBlockReceipts` or fetches every transaction receipt.
 - A DB enqueue, local test, synthetic hash, or `PENDING_BROADCAST` state
   is not a submission.
+- `inspect` exposes `wrappedNative` (the 18-decimal WETH quote asset) and
+  `collateral` (the 6-decimal test collateral, mTUSD on the current
+  testnet) as separate fields. Native quote units stay separate from
+  payout collateral.
 
 ## Library functions
 
-`readTerms`, `fetchWitnesses`, `verifyReceiptBlock`, `buildSwapBatches`,
-`estimateBatch`, `submitBatch`, `confirmSubmission`, `readCredits`,
-`readReward`, `claimBounty`. All accept injected public/wallet clients;
-there are no environment-specific singletons.
+`decodeRobinhoodHeader`, `encodeRobinhoodHeader`, `computeReceiptsRoot`,
+`buildReceiptProof`, `verifyReceiptProof`, `verifyReceiptLog`,
+`captureReceiptBlock`, `buildActivityProofs`, `qualifyActivitySwap`,
+`batchActivityProofs`, `naturalKey`, `HttpRpc`. The CLI adds `inspect`,
+`fetchBlock`, `verifyBlock`, `planBlock`, `rewards`, `submitBatch`,
+`confirmSubmission`, and `claimBounty`. All accept injected public/wallet
+clients; there are no environment-specific singletons.
 
 ## Tests
 
