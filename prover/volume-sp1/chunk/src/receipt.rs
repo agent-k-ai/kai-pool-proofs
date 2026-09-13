@@ -1,23 +1,32 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Alpha Tech Organization
 //! Minimal integration adapter, not a delivered Qwen parser. See SOURCE-ORIGINS.json.
-//! Supports post-Byzantium legacy, EIP-2930/1559, and observed Nitro typed receipts
-//! 0x04, 0x64, 0x68, 0x69, 0x6a. Each observed type carries the identical standard
-//! four-field body [status, cumulativeGasUsed, logsBloom, logs]; only the leading
-//! envelope type byte differs. Verified against real chain 46630 whole-block vectors
-//! (blocks 118183060, 118186604, 118189847), whose computed receiptsRoot matches the
+//! Supports post-Byzantium legacy (unprefixed RLP list) and the typed receipt
+//! envelopes 0x01, 0x02, 0x03, 0x04, 0x64, 0x65, 0x66, 0x68, 0x69, 0x6a. Every
+//! typed envelope carries the identical standard four-field body
+//! [status, cumulativeGasUsed, logsBloom, logs]; only the leading type byte
+//! differs. Verified against real chain 46630 whole-block vectors (blocks
+//! 118183060, 118186604, 118189847), whose computed receiptsRoot matches the
 //! frozen header root.
 //!
-//! Source authority: go-ethereum 0f618f3 core/types/receipt.go EncodeIndex builds the body as
-//! `receiptRLP{statusEncoding, CumulativeGasUsed, Bloom, Logs}` — the same four-field body
-//! observed on chain 46630. core/types/transaction.go names the typed values
-//! 0x64/0x65/0x66/0x68/0x69/0x6a (Arbitrum) plus 0x01/0x02/0x03/0x04.
+//! Source authority: go-ethereum 0f618f3 (pinned Nitro master submodule; a
+//! source pin, not evidence of the deployed runtime revision).
+//! core/types/receipt.go EncodeIndex builds the body as
+//! `receiptRLP{statusEncoding, CumulativeGasUsed, Bloom, Logs}` — the same
+//! four-field body observed on chain 46630. core/types/transaction.go names
+//! the typed values 0x64/0x65/0x66/0x68/0x69/0x6a (Arbitrum) plus
+//! 0x01/0x02/0x03/0x04.
 //!
-//! 0x78 (ArbitrumLegacyTxType) and 0x00 (LegacyTxType) take the UNPREFIXED branch:
-//! `rlp.Encode(w, data)` returns before `w.WriteByte(r.Type)` is reached. Because `data` is an
-//! RLP list, the leading byte of an unprefixed receipt is a list header in 0xc0..=0xff.
-//! A leading 0x78 or 0x00 therefore never occurs in the receipt trie, and this parser rejects
-//! both. 0x67 and 0x6b are absent from the upstream type table entirely.
+//! 0x78 (ArbitrumLegacyTxType) and 0x00 (LegacyTxType) take the UNPREFIXED
+//! branch at receipt.go:475-479: `rlp.Encode(w, data)` returns before
+//! `w.WriteByte(r.Type)` is reached. Because `data` is an RLP list, the
+//! leading byte of an unprefixed receipt is a list header in 0xc0..=0xff.
+//! A leading 0x78 or 0x00 therefore never occurs in the receipt trie, and
+//! this parser rejects both. 0x67 and 0x6b are absent from the upstream type
+//! table entirely.
+//!
+//! 0x03/0x65/0x66 are unobserved in the corpus and are covered by synthetic
+//! source-conformance vectors. Unknown type bytes fail closed.
 use crate::{Error, Result};
 use kai_volume_core::DecodedLog;
 use kai_volume_primitives::rlp::{self, Items};
@@ -46,7 +55,7 @@ where
         .ok_or(Error::Receipt("empty receipt value"))?;
     let (envelope_type, payload) = match first {
         0xc0..=0xff => (None, encoded),
-        0x01 | 0x02 | 0x04 | 0x64 | 0x68 | 0x69 | 0x6a => (Some(first), &encoded[1..]),
+        0x01 | 0x02 | 0x03 | 0x04 | 0x64 | 0x65 | 0x66 | 0x68 | 0x69 | 0x6a => (Some(first), &encoded[1..]),
         _ => return Err(Error::Receipt("unsupported receipt envelope")),
     };
     let mut fields = Items::new(payload).map_err(rlp_error)?;

@@ -730,14 +730,18 @@ export function hashedTrieNodes(receipts: readonly IndexedBlockReceipt[]): Hex[]
  * Enforces the exact receipt envelope rules of the integrated SP1 chunk
  * adapter (`prover/volume-sp1/chunk/src/receipt.rs`) on the decoded
  * receipt the capture path re-encodes into the frame. The adapter accepts
- * only legacy (type 0), `0x01`, `0x02`, and the observed Nitro `0x6a`.
- * Status and cumulative gas are re-encoded canonically by `encodeReceipt`
- * and must stay in the adapter's range; any other raw encoding would also
- * fail the receipts-root check. The general-purpose decoder stays broader;
- * this check is capture-only.
+ * legacy (type 0, unprefixed RLP — the same shape upstream EncodeIndex uses
+ * for ArbitrumLegacyTxType 0x78, so 0x78 has no typed arm) and the typed
+ * envelopes 0x01, 0x02, 0x03, 0x04, 0x64, 0x65, 0x66, 0x68, 0x69, 0x6a,
+ * mirroring the explicit cases of Receipts.EncodeIndex in the pinned Nitro
+ * go-ethereum submodule 0f618f330b8d (master source pin, not the deployed
+ * runtime revision). Status and cumulative gas are re-encoded canonically
+ * by `encodeReceipt` and must stay in the adapter's range; any other raw
+ * encoding would also fail the receipts-root check. The general-purpose
+ * decoder stays broader; this check is capture-only.
  */
 export function validateGuestReceiptCompat(receipt: IndexedBlockReceipt): void {
-  if (![0, 1, 2, 0x6a].includes(receipt.type)) fail("CHUNK_RECEIPT_TYPE");
+  if (![0, 1, 2, 3, 4, 0x64, 0x65, 0x66, 0x68, 0x69, 0x6a].includes(receipt.type)) fail("CHUNK_RECEIPT_TYPE");
   if (receipt.status !== 0 && receipt.status !== 1) fail("CHUNK_RECEIPT_STATUS");
   if (receipt.cumulativeGasUsed > 0xffffffffffffffffn) fail("CHUNK_RECEIPT_GAS");
 }
