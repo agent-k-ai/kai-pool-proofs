@@ -15,6 +15,18 @@ use sp1_sdk::{
 };
 use std::{error::Error, fs, io::Read, path::Path, time::Instant};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
+// SDK 6.7.0 embeds the runner override at BUILD time. A runtime environment
+// variable cannot relocate it. Refuse a different path instead of silently
+// executing an unpinned helper; public users build with their own pinned path.
+fn runner_binding() -> Result<()> {
+    let compiled = option_env!("SP1_CORE_RUNNER_OVERRIDE_BINARY")
+        .ok_or("build host with an explicit pinned external runner")?;
+    let selected = std::env::var("SP1_CORE_RUNNER_OVERRIDE_BINARY")?;
+    if fs::canonicalize(compiled)? != fs::canonicalize(selected)? {
+        return Err("runtime runner differs from SDK build-time binding; rebuild host at your own pinned path".into());
+    }
+    Ok(())
+}
 fn sha(b: &[u8]) -> String {
     hex::encode(Sha256::digest(b))
 }
@@ -84,6 +96,7 @@ fn cache_gate(manifest: &[u8]) -> Result<Value> {
 }
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<()> {
+    runner_binding()?;
     let a: Vec<_> = std::env::args().collect();
     if a.len() < 8
         || !matches!(a[1].as_str(), "prove" | "verify")
@@ -153,10 +166,13 @@ async fn main() -> Result<()> {
     fs::create_dir(out)?;
     let param_manifest = fs::read(&a[5])?;
     let source = fs::read(&a[6])?;
+    if meta["files"]["source-manifest.json"]["sha256"].as_str() != Some(sha(&source).as_str()) {
+        return Err("source manifest differs from frozen plan".into());
+    }
     let mut m = json!({"release":env!("CARGO_PKG_VERSION"),"phase":a[1],"proofForm":"Groth16","sdkVersion":"6.7.0","circuitVersion":"v6.1.0","planSha256":sha(&pm),
         "sourceManifestSha256":sha(&source),"parameterManifestSha256":sha(&param_manifest),"guestElfSha256":sha(&data[1]),"programVKey":rvk.bytes32(),"programVkBincodeSha256":sha(&bincode::serialize(rvk)?),
         "inputSha256":sha(&input),"suiteHash":hex::encode(suite.suite_hash()?),"termsHash":hex::encode(terms.terms_hash()?),"publicValuesSha256":sha(&pending.journal),"publicValuesBytes":800,
-        "coreVerifyIntermediates":true,"recursionVerifyIntermediates":true,"recursionVkVerification":true,"circuitMode":"release","cryptographicProofGenerated":false,"cryptographicProofVerified":false,"syntheticTermsAndAdmission":true});
+        "coreVerifyIntermediates":true,"recursionVerifyIntermediates":true,"recursionVkVerification":true,"circuitMode":"release","cryptographicProofGenerated":false,"cryptographicProofVerified":false,"contextOrigin":meta["contextOrigin"].as_str().unwrap_or("diagnostic-synthetic"),"chainAcceptanceEstablished":false});
     fs::write(out.join("program-vk.bin"), bincode::serialize(rvk)?)?;
     fs::write(out.join("source-manifest.json"), source)?;
     save(out, &m)?;

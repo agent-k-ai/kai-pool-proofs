@@ -146,7 +146,17 @@ function syntheticSwapBlock(): { block: CapturedReceiptBlock; receipts: IndexedB
       poolId,
       `0x${SENDER.slice(2).padStart(64, "0")}` as Hex,
     ],
-    data: encodeAbiParameters([{ type: "int128" }, { type: "int128" }], [1_000n, -2_000n]),
+    data: encodeAbiParameters(
+      [
+        { type: "int128" },
+        { type: "int128" },
+        { type: "uint160" },
+        { type: "uint128" },
+        { type: "int24" },
+        { type: "uint24" },
+      ],
+      [1_000n, -2_000n, 7_923_485_200_305_140_259n, 100_000n, 0, 2_000_000],
+    ),
   };
   const fillerLog = {
     address: V3_POOL_B,
@@ -155,7 +165,16 @@ function syntheticSwapBlock(): { block: CapturedReceiptBlock; receipts: IndexedB
       `0x${SENDER.slice(2).padStart(64, "0")}` as Hex,
       `0x${SENDER.slice(2).padStart(64, "0")}` as Hex,
     ],
-    data: encodeAbiParameters([{ type: "int256" }, { type: "int256" }], [-1_000n, 2_000n]),
+    data: encodeAbiParameters(
+      [
+        { type: "int256" },
+        { type: "int256" },
+        { type: "uint160" },
+        { type: "uint128" },
+        { type: "int24" },
+      ],
+      [-1_000n, 2_000n, 7_923_485_200_305_140_259n, 100_000n, 0],
+    ),
   };
   const receipts: IndexedBlockReceipt[] = [
     { transactionIndex: 0, type: 2, status: 1, cumulativeGasUsed: 50_000n, logsBloom: BLOOM, logs: [swapLog] },
@@ -218,6 +237,7 @@ describe("buildActivityProofs", () => {
       ],
       [TOKEN_A, TOKEN_B],
       46630,
+      WETH,
     );
     expect(proofs).toHaveLength(1);
     expect(proofs[0].txIndex).toBe(0);
@@ -248,6 +268,7 @@ describe("buildActivityProofs", () => {
       ],
       [TOKEN_A, TOKEN_B],
       46630,
+      WETH,
     );
     expect(proofs[0].txIndex).toBe(1);
     expect(proofs[0].logIndex).toBe(0);
@@ -276,6 +297,7 @@ describe("buildActivityProofs", () => {
         ],
         [TOKEN_A, TOKEN_B],
         46630,
+        WETH,
       ),
     ).toThrow("RECEIPT_QUALIFICATION_MISMATCH");
   });
@@ -302,6 +324,7 @@ describe("buildActivityProofs", () => {
         ],
         [TOKEN_A, TOKEN_B],
         46630,
+        WETH,
       ),
     ).toThrow("RECEIPT_POOL_MISMATCH");
   });
@@ -329,6 +352,7 @@ describe("buildActivityProofs", () => {
         ],
         [TOKEN_A, TOKEN_B],
         46630,
+        WETH,
       ),
     ).toThrow("RECEIPT_BUNDLE_MISMATCH");
   });

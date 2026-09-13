@@ -1,9 +1,9 @@
 {
   "name": "@kai-pool-proofs/cli",
-  "version": "0.1.0",
+  "version": "0.1.0-node.20260912f",
   "type": "module",
   "license": "Apache-2.0",
-  "description": "Public VOLUME proof CLI: fetch, verify, plan, submit, confirm, rewards, claim. Own RPC and own wallet only.",
+  "description": "Own-RPC SP1 VOLUME node: resumable capture/proving, injected-wallet submission, canonical credits and earned claims; separate receipt diagnostics.",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -13,6 +13,9 @@
     "viem": "2.56.1"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0"
+    "@types/node": "24.13.4"
+  },
+  "bin": {
+    "volume-sp1-node": "dist/sp1/index.js"
   }
 }

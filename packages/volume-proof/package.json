@@ -1,6 +1,6 @@
 {
   "name": "@kai-pool-proofs/volume-proof",
-  "version": "0.1.0",
+  "version": "0.1.0-node.20260912f",
   "type": "module",
   "license": "Apache-2.0",
   "description": "Pure VOLUME proof logic: wire schema, header/receipt-root verification, venue qualification, Swap batch building.",
@@ -19,6 +19,6 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0"
+    "@types/node": "24.13.4"
   }
 }

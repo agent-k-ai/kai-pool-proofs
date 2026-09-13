@@ -1,0 +1,40 @@
+{
+  "sdkVersion": "6.7.0",
+  "zkvmVersion": "6.7.0",
+  "buildVersion": "6.7.0",
+  "circuitVersion": "v6.1.0",
+  "cargoVersion": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+  "rustcVersion": "1.94.0-dev (compiler commit reported unknown)",
+  "goVersion": "1.24.13",
+  "toolchainDistribution": "public distribution locator for this exact compiler remains a release gate; do not substitute a latest installer",
+  "tools": {
+    "rustc": {
+      "sha256": "2e952f92635ee0388b5eac9b06f2fec7b23a620b0a7dbcceab576caeb89cb160"
+    },
+    "rustcDriver": {
+      "sha256": "db572b411a9458e154fcc59bd900a0280fa0b4b1b8659945efc54cec126b5136"
+    },
+    "rustLld": {
+      "sha256": "0b0167ce93337779dcf042535a9a0078936f661c2bca16b33eb958414cca5b7e"
+    },
+    "riscvGcc": {
+      "sha256": "b4456006f0ae5ad4e1390ee17fe537865775d59d433a16786accf4a81eb3f68a"
+    },
+    "go": {
+      "sha256": "84a0e87421e4cc48036b48ee32374de17479b7f8592822dcc57c93aa3ff337a7"
+    },
+    "runner": {
+      "sha256": "99655ab85740820a1ab7bdc282b461ca23d8a27d1b53cb7c5e04074cea093b98"
+    }
+  },
+  "chunkElf": {
+    "sourceCommit": "3cbabe7907c6b2ba3c498a54e2c977cbab2e17c1",
+    "sha256": "d81a33578657f97389f32809739bd8b2a98246372d98ff30581515167762679c",
+    "programVKey": "0x0047524ded6a2d1c041f38acaaecba6f620fa552ff4ea6657b58957fe8d87e60"
+  },
+  "rangeElf": {
+    "sourceCommit": "9a12b81f3587ccc4e903593fbd52c5ebeb7349eb",
+    "sha256": "1d9d837677c3f363f3b7a0ee9f7117a3d1cdbc23d0c18df61727fe6872a8aadd",
+    "programVKey": "0x00f9a794e2d64a86dca48bb66e37b7ee87294a7fac27fdecbbd5bd0f41f6c00a"
+  }
+}

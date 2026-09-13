@@ -1,6 +1,6 @@
 [package]
 name = "volume-chunk-host"
-version.workspace = true
+version = "0.1.0-node.20260912f"
 edition.workspace = true
 license.workspace = true
 publish.workspace = true

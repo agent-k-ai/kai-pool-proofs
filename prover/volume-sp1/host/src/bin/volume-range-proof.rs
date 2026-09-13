@@ -20,6 +20,18 @@ use sp1_sdk::{
 use std::{error::Error, fs, path::Path, time::Instant};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 const CHUNK_ELF_SHA256: &str = "d81a33578657f97389f32809739bd8b2a98246372d98ff30581515167762679c";
+// SDK 6.7.0 embeds the runner override at BUILD time. A runtime environment
+// variable cannot relocate it. Refuse a different path instead of silently
+// executing an unpinned helper; public users build with their own pinned path.
+fn runner_binding() -> Result<()> {
+    let compiled = option_env!("SP1_CORE_RUNNER_OVERRIDE_BINARY")
+        .ok_or("build host with an explicit pinned external runner")?;
+    let selected = std::env::var("SP1_CORE_RUNNER_OVERRIDE_BINARY")?;
+    if fs::canonicalize(compiled)? != fs::canonicalize(selected)? {
+        return Err("runtime runner differs from SDK build-time binding; rebuild host at your own pinned path".into());
+    }
+    Ok(())
+}
 fn sha(b: &[u8]) -> String {
     hex::encode(Sha256::digest(b))
 }
@@ -99,6 +111,7 @@ struct Plan {
     range_vk: SP1VerifyingKey,
     manifest_sha: String,
     source_sha: String,
+    context_origin: String,
 }
 impl Plan {
     fn vk(&self, r: Role) -> &SP1VerifyingKey {
@@ -161,6 +174,10 @@ impl Plan {
             range_vk,
             manifest_sha: sha(&raw),
             source_sha: sha(&data[4]),
+            context_origin: m["contextOrigin"]
+                .as_str()
+                .unwrap_or("diagnostic-synthetic")
+                .to_owned(),
         })
     }
     fn expected(&self, r: Role, f: &[Vec<u8>]) -> Result<[u8; 800]> {
@@ -225,6 +242,67 @@ impl Plan {
         }
         Ok((stdin, json!(child_records)))
     }
+}
+
+/// Freeze supplied bytes without manufacturing a suite or changing any race terms.
+/// On-chain approval/canonicality is checked separately by the public node.
+async fn freeze_context(a: &[String]) -> Result<()> {
+    if a.len() != 8 {
+        return Err(
+            "freeze-context CHUNK.elf RANGE.elf TERMS.abi SUITE.abi SOURCE-MANIFEST.json NEW-PLAN"
+                .into(),
+        );
+    }
+    let data = a[2..7]
+        .iter()
+        .map(fs::read)
+        .collect::<std::io::Result<Vec<_>>>()?;
+    if sha(&data[0]) != CHUNK_ELF_SHA256 {
+        return Err("retained chunk ELF mismatch".into());
+    }
+    let terms = VolumeTermsV1::abi_decode(&data[2])?;
+    let suite = VolumeProofSuiteV1::abi_decode(&data[3])?;
+    suite.validate_terms(&terms)?;
+    let light = ProverClient::builder().light().build().await;
+    let mut keys = Vec::new();
+    for (i, role) in [Role::Chunk, Role::Range].into_iter().enumerate() {
+        let pk = light.setup(Elf::from(data[i].clone())).await?;
+        if vk_bytes32(pk.verifying_key())? != suite.role_key(role) {
+            return Err("supplied suite differs from fresh ELF-derived key".into());
+        }
+        keys.push(bincode::serialize(pk.verifying_key())?);
+    }
+    // Create outputs only after decoding and fresh key checks. The caller commits
+    // this directory atomically as a stage; partial filesystem errors are not success.
+    let out = Path::new(&a[7]);
+    fs::create_dir(out)?;
+    let mut files = json!({});
+    for (name, bytes) in [
+        "chunk.elf",
+        "range.elf",
+        "terms.abi",
+        "suite.abi",
+        "source-manifest.json",
+    ]
+    .into_iter()
+    .zip(&data)
+    {
+        fs::write(out.join(name), bytes)?;
+        files[name] = json!({"sha256":sha(bytes),"bytes":bytes.len()});
+    }
+    for (name, bytes) in ["chunk-vk.bin", "range-vk.bin"].into_iter().zip(&keys) {
+        fs::write(out.join(name), bytes)?;
+        files[name] = json!({"sha256":sha(bytes),"bytes":bytes.len()});
+    }
+    let m = json!({"release":env!("CARGO_PKG_VERSION"),"hostInterface":"freeze-context/v1",
+        "sdkVersion":"6.7.0","circuitVersion":"v6.1.0","files":files,
+        "contextOrigin":"supplied-immutable-bytes","chainAcceptanceEstablished":false,
+        "suiteHash":hex::encode(suite.suite_hash()?),"termsHash":hex::encode(terms.terms_hash()?),
+        "chunkProgramVKey":hex::encode(suite.chunk_program_vkey),
+        "rangeProgramVKey":hex::encode(suite.range_program_vkey)});
+    record(out, "plan.json", &m)?;
+    println!("{m}");
+    Ok(())
 }
 
 async fn freeze_diagnostic(a: &[String]) -> Result<()> {
@@ -399,7 +477,7 @@ async fn run(a: &[String]) -> Result<()> {
         "planSha256":plan.manifest_sha,"sourceManifestSha256":plan.source_sha,"guestElfSha256":sha(plan.elf(r)),"vk":vk_meta(plan.vk(r))?,
         "suiteHash":hex::encode(plan.suite.suite_hash()?),"termsHash":hex::encode(plan.terms.terms_hash()?),"inputSha256":sha(&input),"inputBytes":input.len(),
         "nativeJournalSha256":sha(&expected),"cryptographicProofGenerated":false,"cryptographicProofVerified":false,
-        "syntheticTerms":true,"deployedRaceEstablished":false,"actualFourEntrantRaceAcceptance":false,"resolvedWorkerConfig":safety()?});
+        "contextOrigin":plan.context_origin,"deployedRaceEstablished":false,"actualFourEntrantRaceAcceptance":false,"resolvedWorkerConfig":safety()?});
     record(out, "metrics.json", &m)?;
     let proof;
     if phase == "verify" {
@@ -524,10 +602,12 @@ async fn run(a: &[String]) -> Result<()> {
 }
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<()> {
+    runner_binding()?;
     safety()?;
     sp1_sdk::setup_logger();
     let a: Vec<_> = std::env::args().collect();
     match a.get(1).map(String::as_str) {
+        Some("freeze-context") => freeze_context(&a).await,
         Some("freeze-diagnostic") => freeze_diagnostic(&a).await,
         Some("assemble") => assemble(&a).await,
         _ => run(&a).await,

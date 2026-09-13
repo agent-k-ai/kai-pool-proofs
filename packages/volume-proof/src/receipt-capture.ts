@@ -27,7 +27,9 @@ import {
   decodeV4SwapLog,
   poolKeyQualifies,
   qualifyActivitySwap,
+  PONS_ACTIVITY_METRIC_VOLUME_QUOTE,
   type ActivityPoolKey,
+  type PonsActivityMetric,
 } from "./activity-qualification.js";
 import type { ReadRpc } from "./rpc.js";
 import { naturalKey } from "./identity.js";
@@ -141,12 +143,19 @@ export type { BuiltSwapProof };
  * Builds receipt proofs for the selected swaps and rechecks every log
  * inside its proof: header hash, receipts root, pool id, pool key rule,
  * entrant qualification, quote amount, and sender. Any mismatch throws.
+ *
+ * `wrapper` is the adapter's verified wrapped-native address. A native
+ * venue keeps the raw zero in its pool key; qualification maps it to the
+ * wrapper for the accounting quote. `metric` is the race metric read
+ * from the adapter, not a local assumption.
  */
 export function buildActivityProofs(
   block: CapturedReceiptBlock,
   candidates: readonly SwapCandidate[],
   entrants: readonly Address[],
   chainId: number,
+  wrapper: Address,
+  metric: PonsActivityMetric = PONS_ACTIVITY_METRIC_VOLUME_QUOTE,
 ): BuiltSwapProof[] {
   if (
     keccak256(block.encodedHeader) !== block.blockHash ||
@@ -178,7 +187,8 @@ export function buildActivityProofs(
       throw new Error("RECEIPT_POOL_MISMATCH");
     const qualification = qualifyActivitySwap({
       entrants,
-      metric: 1,
+      metric,
+      wrapper,
       raceQuoteAsset: candidate.quoteAsset,
       minNotional: { [getAddress(candidate.quoteAsset)]: candidate.minNotional },
       poolKey: candidate.key,

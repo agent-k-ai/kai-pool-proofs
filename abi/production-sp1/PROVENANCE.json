@@ -1,0 +1,30 @@
+{
+  "kind": "compiler-artifact-import/v1",
+  "deployedRuntime": false,
+  "artifacts": {
+    "PonsVolumeSp1Adapter.json": {
+      "sha256": "c76b996423ffebfac803a1a727244e2240f75d7c7a045e0de7e962b2c31cc824",
+      "bytes": 241497,
+      "sourceCommit": "b84fdd3f119aa2ade748b4cf0e616f5b7c1f4e94",
+      "fundingParent": "5230428c1c7629a39472a79b9d3b8f46013b8c05"
+    },
+    "PonsVolumeSp1Controller.json": {
+      "sha256": "acb19712f91d5b0440795f99e3173d02b17c2b5583233cbc3c55114841ba5ddb",
+      "bytes": 236335,
+      "sourceCommit": "b84fdd3f119aa2ade748b4cf0e616f5b7c1f4e94",
+      "fundingParent": "5230428c1c7629a39472a79b9d3b8f46013b8c05"
+    },
+    "PonsVolumeSp1Pool.json": {
+      "sha256": "399f740338765a1956f3e293c030efd6d2fe4a2d480f49f703440f86e0d917dd",
+      "bytes": 263209,
+      "sourceCommit": "b84fdd3f119aa2ade748b4cf0e616f5b7c1f4e94",
+      "fundingParent": "5230428c1c7629a39472a79b9d3b8f46013b8c05"
+    },
+    "SP1Verifier.json": {
+      "sha256": "55aafe2115507bc8deeb986fd4d6b7f762c78ddd334e66cc7e59f37ea7c3383b",
+      "bytes": 67640,
+      "upstreamCommit": "d3629729c3216eb51bd4859d027a8eb729399fa4",
+      "circuitVersion": "v6.1.0"
+    }
+  }
+}

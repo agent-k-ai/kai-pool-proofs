@@ -43,4 +43,35 @@ describe("keystore V3", () => {
       "KEYSTORE_UNSUPPORTED_VERSION",
     );
   });
+
+  it("accepts a MAC written without the 0x prefix", () => {
+    const keystore = encryptPrivateKey(privateKey, "correct horse", account.address);
+    const rawMac = keystore.crypto.mac.slice(2);
+    const noPrefix = {
+      ...keystore,
+      crypto: { ...keystore.crypto, mac: rawMac as unknown as `0x${string}` },
+    };
+    expect(decryptPrivateKey(noPrefix, "correct horse")).toBe(privateKey);
+  });
+
+  it("rejects excessive KDF work before any KDF runs", () => {
+    const keystore = encryptPrivateKey(privateKey, "correct horse", account.address);
+    const heavy = {
+      ...keystore,
+      crypto: {
+        ...keystore.crypto,
+        kdfparams: { ...keystore.crypto.kdfparams, n: 2 ** 21 },
+      },
+    };
+    expect(() => decryptPrivateKey(heavy, "correct horse")).toThrow("KEYSTORE_KDF_WORK_EXCESSIVE");
+  });
+
+  it("rejects a non-hex MAC", () => {
+    const keystore = encryptPrivateKey(privateKey, "correct horse", account.address);
+    const badMac = {
+      ...keystore,
+      crypto: { ...keystore.crypto, mac: "0xzz" as unknown as `0x${string}` },
+    };
+    expect(() => decryptPrivateKey(badMac, "correct horse")).toThrow("KEYSTORE_BAD_HEX");
+  });
 });

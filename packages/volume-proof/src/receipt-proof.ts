@@ -266,6 +266,39 @@ export class ReceiptsTrie {
     return keccak256(encodeNode(this.root_));
   }
 
+  /**
+   * Every hashed (RLP encoding at least 32 bytes) node reachable from the
+   * root, each once, sorted strictly ascending by Keccak(node bytes).
+   * Inline children stay inside their parent and are not listed. This is
+   * the complete corpus the V1 chunk block frame carries.
+   */
+  hashedNodes(): Hex[] {
+    const out: Hex[] = [];
+    const seen = new Set<string>();
+    const visit = (node: TrieNode): void => {
+      const encoded = encodeNode(node);
+      if (byteLength(encoded) >= 32) {
+        const hash = keccak256(encoded);
+        if (seen.has(hash)) fail();
+        seen.add(hash);
+        out.push(encoded);
+      }
+      if (node.kind === "leaf") return;
+      if (node.kind === "extension") {
+        visit(node.child);
+        return;
+      }
+      for (const child of node.children) if (child) visit(child);
+    };
+    visit(this.root_);
+    out.sort((a, b) => {
+      const ha = keccak256(a);
+      const hb = keccak256(b);
+      return ha < hb ? -1 : ha > hb ? 1 : 0;
+    });
+    return out;
+  }
+
   value(transactionIndex: number): Hex {
     return (this.entries.get(transactionIndex) ?? fail()).value;
   }

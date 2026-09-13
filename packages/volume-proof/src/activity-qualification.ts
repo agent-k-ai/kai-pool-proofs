@@ -39,6 +39,14 @@ export const V3_SWAP_TOPIC =
 /** A Uniswap V4 pool key sets this flag instead of a static fee. */
 export const UNISWAP_V4_DYNAMIC_FEE_FLAG = 0x800000;
 
+/** Production V4 Swap log data length, mirroring the adapter constant. */
+export const V4_SWAP_DATA_BYTES = 192;
+/** Production V3 Swap log data length, mirroring the adapter constant. */
+export const V3_SWAP_DATA_BYTES = 160;
+
+/** The native venue carries the zero address as its pool currency. */
+export const NATIVE_CURRENCY = "0x0000000000000000000000000000000000000000" as const;
+
 export interface ActivityPoolKey {
   currency0: Address;
   currency1: Address;
@@ -123,9 +131,11 @@ export function decodeV4SwapLog(log: ActivitySwapLog): DecodedSwap {
   if (log.topics.length !== 3 || log.topics[0]?.toLowerCase() !== V4_SWAP_TOPIC) {
     throw new Error("ACTIVITY_SWAP_LOG_INVALID");
   }
+  const dataBytes = (log.data.length - 2) / 2;
+  if (dataBytes !== V4_SWAP_DATA_BYTES) throw new Error("ACTIVITY_SWAP_DATA_LENGTH");
   const [amount0, amount1] = decodeAbiParameters(
     [{ type: "int128" }, { type: "int128" }],
-    log.data,
+    `0x${log.data.slice(2, 2 + 128)}` as Hex,
   );
   return {
     poolId: (log.topics[1] ?? "0x") as Hex,
@@ -141,9 +151,11 @@ export function decodeV3SwapLog(log: ActivitySwapLog): DecodedSwap {
   if (log.topics.length !== 3 || log.topics[0]?.toLowerCase() !== V3_SWAP_TOPIC) {
     throw new Error("ACTIVITY_SWAP_LOG_INVALID");
   }
+  const dataBytes = (log.data.length - 2) / 2;
+  if (dataBytes !== V3_SWAP_DATA_BYTES) throw new Error("ACTIVITY_SWAP_DATA_LENGTH");
   const [amount0, amount1] = decodeAbiParameters(
     [{ type: "int256" }, { type: "int256" }],
-    log.data,
+    `0x${log.data.slice(2, 2 + 128)}` as Hex,
   );
   return {
     poolId: `0x${getAddress(log.address).slice(2).toLowerCase().padStart(64, "0")}` as Hex,
@@ -172,12 +184,17 @@ function absolute(value: bigint): bigint {
 /**
  * Mirrors the adapter rule that picks the entrant and measures the quote amount.
  *
- * `minNotional` keys are matched case-insensitively, as on-chain address
- * mapping lookups are: the returned `quoteAsset` is checksummed.
+ * `wrapper` is the adapter's verified wrapped-native address. A native
+ * venue carries the zero address in the pool key; the pool id and the
+ * key keep the raw zero, while the accounting quote is the wrapper, as
+ * the adapter's `_quoteAssetOfCurrency` maps it. `minNotional` keys are
+ * matched case-insensitively, as on-chain address mapping lookups are:
+ * the returned `quoteAsset` is checksummed.
  */
 export function qualifyActivitySwap(input: {
   entrants: readonly Address[];
   metric: PonsActivityMetric;
+  wrapper: Address;
   raceQuoteAsset?: Address;
   minNotional: Readonly<Record<Address, bigint>>;
   poolKey: ActivityPoolKey;
@@ -185,18 +202,22 @@ export function qualifyActivitySwap(input: {
 }): ActivityQualification | null {
   const currency0 = getAddress(input.poolKey.currency0);
   const currency1 = getAddress(input.poolKey.currency1);
+  const wrapper = getAddress(input.wrapper);
   for (let index = 0; index < input.entrants.length; index += 1) {
     const token = getAddress(input.entrants[index] ?? "0x");
-    let quoteAsset: Address;
+    let rawQuote: Address;
     let tokenDelta: bigint;
     let quoteDelta: bigint;
     if (token === currency0) {
-      [quoteAsset, tokenDelta, quoteDelta] = [currency1, input.swap.amount0, input.swap.amount1];
+      [rawQuote, tokenDelta, quoteDelta] = [currency1, input.swap.amount0, input.swap.amount1];
     } else if (token === currency1) {
-      [quoteAsset, tokenDelta, quoteDelta] = [currency0, input.swap.amount1, input.swap.amount0];
+      [rawQuote, tokenDelta, quoteDelta] = [currency0, input.swap.amount1, input.swap.amount0];
     } else {
       continue;
     }
+    // The adapter maps the zero currency to the wrapped native for
+    // qualification. The pool key and pool id keep the raw zero.
+    const quoteAsset = rawQuote === NATIVE_CURRENCY ? wrapper : rawQuote;
     const floor =
       input.minNotional[quoteAsset] ??
       input.minNotional[quoteAsset.toLowerCase() as Address] ??

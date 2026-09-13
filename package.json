@@ -1,10 +1,10 @@
 {
   "name": "kai-pool-proofs",
-  "version": "0.1.0",
+  "version": "0.1.0-node.20260912f",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
-  "description": "Open-source, independently runnable VOLUME proof-submission code for prediction pools on Robinhood testnet 46630.",
+  "description": "Own-RPC SP1 VOLUME proof node and separate receipt diagnostics for chain 46630.",
   "scripts": {
     "build": "pnpm -r build",
     "test": "vitest run",

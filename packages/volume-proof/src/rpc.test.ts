@@ -94,6 +94,22 @@ describe("HttpRpc", () => {
     await expect(rpc.request("eth_blockNumber", [])).rejects.toThrow("RPC_UNAVAILABLE");
   });
 
+  it("returns null for a pending receipt instead of failing", async () => {
+    const fetcher = makeFetcher((_url, method) =>
+      method === "eth_chainId" ? "0xb626" : null,
+    );
+    const rpc = new HttpRpc(46630, ["http://rpc.example"], fetcher);
+    expect(await rpc.request("eth_getTransactionReceipt", ["0x1"])).toBeNull();
+  });
+
+  it("still fails a null result for a non-nullable method", async () => {
+    const fetcher = makeFetcher((_url, method) =>
+      method === "eth_chainId" ? "0xb626" : null,
+    );
+    const rpc = new HttpRpc(46630, ["http://rpc.example"], fetcher);
+    await expect(rpc.request("eth_blockNumber", [])).rejects.toThrow("RPC_UNAVAILABLE");
+  });
+
   it("requires at least one endpoint", () => {
     expect(() => new HttpRpc(46630, [])).toThrow("HTTP_RPC_REQUIRED");
   });

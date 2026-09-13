@@ -1,0 +1,88 @@
+{
+  "kind": "volume-sp1-parameter-identities/v1",
+  "circuitVersion": "v6.1.0",
+  "files": [
+    {
+      "file": "._.",
+      "bytes": 163,
+      "sha256": "a8d7edcaf5cde6ccdb9d056770ecd3edadcdd9010dad9d9b61e026f4732cd0e0"
+    },
+    {
+      "file": "._Groth16Verifier.sol",
+      "bytes": 163,
+      "sha256": "a8d7edcaf5cde6ccdb9d056770ecd3edadcdd9010dad9d9b61e026f4732cd0e0"
+    },
+    {
+      "file": "._SP1VerifierGroth16.sol",
+      "bytes": 163,
+      "sha256": "a8d7edcaf5cde6ccdb9d056770ecd3edadcdd9010dad9d9b61e026f4732cd0e0"
+    },
+    {
+      "file": "._constraints.json",
+      "bytes": 163,
+      "sha256": "a8d7edcaf5cde6ccdb9d056770ecd3edadcdd9010dad9d9b61e026f4732cd0e0"
+    },
+    {
+      "file": "._groth16_circuit.bin",
+      "bytes": 163,
+      "sha256": "a8d7edcaf5cde6ccdb9d056770ecd3edadcdd9010dad9d9b61e026f4732cd0e0"
+    },
+    {
+      "file": "._groth16_pk.bin",
+      "bytes": 163,
+      "sha256": "a8d7edcaf5cde6ccdb9d056770ecd3edadcdd9010dad9d9b61e026f4732cd0e0"
+    },
+    {
+      "file": "._groth16_vk.bin",
+      "bytes": 163,
+      "sha256": "a8d7edcaf5cde6ccdb9d056770ecd3edadcdd9010dad9d9b61e026f4732cd0e0"
+    },
+    {
+      "file": "._groth16_witness.json",
+      "bytes": 163,
+      "sha256": "a8d7edcaf5cde6ccdb9d056770ecd3edadcdd9010dad9d9b61e026f4732cd0e0"
+    },
+    {
+      "file": ".complete",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "Groth16Verifier.sol",
+      "bytes": 26770,
+      "sha256": "d5e777120d9f675aefcc8c0c8786d4043acb8e063646e60818564b44fb2ec457"
+    },
+    {
+      "file": "SP1VerifierGroth16.sol",
+      "bytes": 3236,
+      "sha256": "48e1db5baca3b102242ebd88280b3689a088076688146cd0d98876f5dacb76d0"
+    },
+    {
+      "file": "constraints.json",
+      "bytes": 111997113,
+      "sha256": "1fb0b3d5f59c45b8f41973b111604aba2402db3c8e887074300ab8d164def92b"
+    },
+    {
+      "file": "groth16_circuit.bin",
+      "bytes": 2437991441,
+      "sha256": "d6a66be2702206e2b1a20bebf7096142864feac9e399a309e5e6e00353264cbc"
+    },
+    {
+      "file": "groth16_pk.bin",
+      "bytes": 5862173061,
+      "sha256": "c3760e0e3b58487f8704680d5b3ad32a9fbca9f3cb0749d69055c4f1271ca167"
+    },
+    {
+      "file": "groth16_vk.bin",
+      "bytes": 492,
+      "sha256": "4388a21c687fdd5f218d7e3d13190cac4c5355818d3605fd5fb811df468ee696"
+    },
+    {
+      "file": "groth16_witness.json",
+      "bytes": 2802920,
+      "sha256": "ee2ac8e094712a87ec3b0dc50ed39704aa90ee066ce4c5bf6160d54f04014c94"
+    }
+  ],
+  "totalBytes": 8414996337,
+  "ceremonyTrust": "external approval; hashes do not establish ceremony trust"
+}

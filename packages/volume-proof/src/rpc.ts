@@ -35,6 +35,13 @@ export interface Header {
 
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
+/**
+ * Methods whose legitimate result is null: a pending or unknown
+ * transaction returns null, not an error. A null result for any other
+ * method is still an RPC failure.
+ */
+const NULLABLE_METHODS = new Set(["eth_getTransactionReceipt", "eth_getTransactionByHash"]);
+
 async function boundedJson(response: Response): Promise<unknown> {
   const reader = response.body?.getReader();
   if (!reader) throw new RpcFailure();
@@ -113,7 +120,11 @@ export class HttpRpc implements ReadRpc {
           body.error.message ?? "",
         ),
       );
-    if (body.result === undefined || body.result === null) throw new RpcFailure();
+    if (body.result === undefined) throw new RpcFailure();
+    if (body.result === null) {
+      if (!NULLABLE_METHODS.has(method)) throw new RpcFailure();
+      return null as T;
+    }
     return body.result;
   }
 
