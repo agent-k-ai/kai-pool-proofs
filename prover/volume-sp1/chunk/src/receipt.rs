@@ -6,8 +6,18 @@
 //! four-field body [status, cumulativeGasUsed, logsBloom, logs]; only the leading
 //! envelope type byte differs. Verified against real chain 46630 whole-block vectors
 //! (blocks 118183060, 118186604, 118189847), whose computed receiptsRoot matches the
-//! frozen header root. Acceptance rests on observed shape equality on chain 46630, not on
-//! a published Nitro receipt-type specification.
+//! frozen header root.
+//!
+//! Source authority: go-ethereum 0f618f3 core/types/receipt.go EncodeIndex builds the body as
+//! `receiptRLP{statusEncoding, CumulativeGasUsed, Bloom, Logs}` — the same four-field body
+//! observed on chain 46630. core/types/transaction.go names the typed values
+//! 0x64/0x65/0x66/0x68/0x69/0x6a (Arbitrum) plus 0x01/0x02/0x03/0x04.
+//!
+//! 0x78 (ArbitrumLegacyTxType) and 0x00 (LegacyTxType) take the UNPREFIXED branch:
+//! `rlp.Encode(w, data)` returns before `w.WriteByte(r.Type)` is reached. Because `data` is an
+//! RLP list, the leading byte of an unprefixed receipt is a list header in 0xc0..=0xff.
+//! A leading 0x78 or 0x00 therefore never occurs in the receipt trie, and this parser rejects
+//! both. 0x67 and 0x6b are absent from the upstream type table entirely.
 use crate::{Error, Result};
 use kai_volume_core::DecodedLog;
 use kai_volume_primitives::rlp::{self, Items};
