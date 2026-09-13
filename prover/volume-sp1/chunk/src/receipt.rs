@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Alpha Tech Organization
 //! Minimal integration adapter, not a delivered Qwen parser. See SOURCE-ORIGINS.json.
-//! Supports post-Byzantium legacy, EIP-2930/1559, and observed Nitro 0x6a receipts.
+//! Supports post-Byzantium legacy, EIP-2930/1559, and observed Nitro typed receipts
+//! 0x04, 0x64, 0x68, 0x69, 0x6a. Each observed type carries the identical standard
+//! four-field body [status, cumulativeGasUsed, logsBloom, logs]; only the leading
+//! envelope type byte differs. Verified against real chain 46633/46630 block vectors.
 use crate::{Error, Result};
 use kai_volume_core::DecodedLog;
 use kai_volume_primitives::rlp::{self, Items};
@@ -30,7 +33,7 @@ where
         .ok_or(Error::Receipt("empty receipt value"))?;
     let (envelope_type, payload) = match first {
         0xc0..=0xff => (None, encoded),
-        0x01 | 0x02 | 0x6a => (Some(first), &encoded[1..]),
+        0x01 | 0x02 | 0x04 | 0x64 | 0x68 | 0x69 | 0x6a => (Some(first), &encoded[1..]),
         _ => return Err(Error::Receipt("unsupported receipt envelope")),
     };
     let mut fields = Items::new(payload).map_err(rlp_error)?;
