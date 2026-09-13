@@ -4,7 +4,10 @@
 //! Supports post-Byzantium legacy, EIP-2930/1559, and observed Nitro typed receipts
 //! 0x04, 0x64, 0x68, 0x69, 0x6a. Each observed type carries the identical standard
 //! four-field body [status, cumulativeGasUsed, logsBloom, logs]; only the leading
-//! envelope type byte differs. Verified against real chain 46633/46630 block vectors.
+//! envelope type byte differs. Verified against real chain 46630 whole-block vectors
+//! (blocks 118183060, 118186604, 118189847), whose computed receiptsRoot matches the
+//! frozen header root. Acceptance rests on observed shape equality on chain 46630, not on
+//! a published Nitro receipt-type specification.
 use crate::{Error, Result};
 use kai_volume_core::DecodedLog;
 use kai_volume_primitives::rlp::{self, Items};

@@ -207,3 +207,56 @@ fn unsupported_type_bytes_still_rejected() {
         );
     }
 }
+
+/// Full acceptance-set sweep over 0x00..=0xff. Pins the exact three-way classification:
+/// - 0xc0..=0xff  -> accepted as LEGACY (envelope_type None), payload is the whole slice
+/// - the seven typed bytes -> accepted as TYPED (envelope_type Some(byte))
+/// - every other byte -> rejected
+/// A future widening, or an accidental wildcard, fails this test.
+#[test]
+fn full_byte_sweep_pins_exact_acceptance_set() {
+    // Valid four-field payload, taken from a real typed receipt minus its type byte.
+    let body: Vec<u8> = VECTORS[0].encoded[1..].to_vec();
+    let accepted: [u8; 7] = [0x01, 0x02, 0x04, 0x64, 0x68, 0x69, 0x6a];
+
+    let mut n_legacy = 0usize;
+    let mut n_typed = 0usize;
+    let mut n_rejected = 0usize;
+
+    for b in 0x00u32..=0xffu32 {
+        let b = b as u8;
+        let is_legacy_range = (0xc0..=0xff).contains(&b);
+        // For the legacy range the whole candidate must itself be the RLP list,
+        // so pass `body` directly. Otherwise prefix the candidate with the type byte.
+        let candidate: Vec<u8> = if is_legacy_range {
+            body.clone()
+        } else {
+            let mut v = vec![b];
+            v.extend_from_slice(&body);
+            v
+        };
+
+        let result = visit_logs(&candidate, |_, _| Ok(()));
+
+        if is_legacy_range {
+            let st = result.unwrap_or_else(|e| panic!("legacy byte {:#04x} must parse, got {:?}", b, e));
+            assert_eq!(st.envelope_type, None, "legacy byte {:#04x} must report no envelope type", b);
+            n_legacy += 1;
+        } else if accepted.contains(&b) {
+            let st = result.unwrap_or_else(|e| panic!("typed byte {:#04x} must parse, got {:?}", b, e));
+            assert_eq!(st.envelope_type, Some(b), "typed byte {:#04x} must report its own envelope type", b);
+            n_typed += 1;
+        } else {
+            assert!(
+                result.is_err(),
+                "byte {:#04x} must be rejected, but it parsed successfully",
+                b
+            );
+            n_rejected += 1;
+        }
+    }
+
+    assert_eq!(n_typed, 7, "exactly seven typed bytes must be accepted");
+    assert_eq!(n_legacy, 64, "0xc0..=0xff is 64 legacy bytes");
+    assert_eq!(n_rejected, 256 - 64 - 7, "all remaining bytes must be rejected");
+}
