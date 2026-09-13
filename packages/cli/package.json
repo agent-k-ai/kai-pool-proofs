@@ -1,6 +1,6 @@
 {
   "name": "@kai-pool-proofs/cli",
-  "version": "0.1.0-node.20260912g",
+  "version": "0.1.0-node.20260913a",
   "type": "module",
   "license": "Apache-2.0",
   "description": "Own-RPC SP1 VOLUME node: resumable capture/proving, injected-wallet submission, canonical credits and earned claims; separate receipt diagnostics.",

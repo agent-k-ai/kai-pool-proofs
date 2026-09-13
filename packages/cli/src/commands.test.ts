@@ -5,7 +5,7 @@
  * Apache-2.0. Copyright 2026 Alpha Tech Organization.
  */
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -759,6 +759,37 @@ describe("captureChunk", () => {
       ]);
       expect(readFileSync(outPath)).toEqual(GOLDEN);
       expect(result.fileBytes).toBe(GOLDEN.length);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("removes the temporary file and preserves the destination when rename fails", async () => {
+    const dir = mkdtempSync(join(process.cwd(), "capture-chunk-test-"));
+    try {
+      const termsPath = join(dir, "terms.hex");
+      writeFileSync(termsPath, encodeTermsAbi(shiftedTerms()));
+      const parent = decodeRobinhoodHeader(fixture.fixture.block.canonicalHeaderRlp).parentHash;
+      const outPath = join(dir, "chunk.frames");
+      // A directory destination makes the rename fail with ENOTEMPTY.
+      mkdirSync(outPath);
+      const config = loadPublicConfig({ rpcUrls: ["http://127.0.0.1:1"], chainId: 46630 });
+      const ctx: CommandContext = { config, rpc: captureRpc() };
+      await expect(
+        captureChunk(ctx, {
+          termsPath,
+          beneficiary: `0x${"42".repeat(20)}`,
+          coverageMask: 15,
+          fromExclusive: BLOCK - 1,
+          toInclusive: BLOCK,
+          beforeHash: parent,
+          endHash: fixture.fixture.block.hash,
+          outPath,
+        }),
+      ).rejects.toThrow();
+      // The existing destination is preserved and no tmp file remains.
+      expect(statSync(outPath).isDirectory()).toBe(true);
+      expect(readdirSync(dir).filter((name) => name.includes(".tmp-"))).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

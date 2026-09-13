@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { bytesToHex, hexToBytes, keccak256, toHex, decodeAbiParameters, encodeAbiParameters, type AbiParameter, type Address, type Hex } from 'viem';
 import { decodeTermsAbi, validateMask, type VolumeTermsV1 } from '@kai-pool-proofs/volume-proof';
-export const NODE_RELEASE = '0.1.0-node.20260912g';
+export const NODE_RELEASE = '0.1.0-node.20260913a';
 export const KIND = 'volume-sp1-node/v1';
 export const CIRCUIT = '0x4388a21c687fdd5f218d7e3d13190cac4c5355818d3605fd5fb811df468ee696';
 export const METHOD = keccak256(toHex('AGENT_KAI_PONS_VOLUME_SP1_COMPLETE_ENTRANT_V1'));

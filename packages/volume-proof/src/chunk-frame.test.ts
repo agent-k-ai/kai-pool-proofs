@@ -36,6 +36,7 @@ import {
   ReceiptsTrie,
   computeReceiptsRoot,
   decodeReceipt,
+  encodeReceipt,
   type IndexedBlockReceipt,
 } from "./receipt-proof.js";
 import {
@@ -307,6 +308,38 @@ describe("hashed node corpus", () => {
     const nodes = new ReceiptsTrie(single).hashedNodes();
     expect(nodes.length).toBeGreaterThanOrEqual(1);
     expect(computeReceiptsRoot(single)).toBe(keccak256(nodes[0]!));
+  });
+
+  it("deduplicates identical node content at distinct trie paths", () => {
+    // 256/512 and 257/513 carry identical receipt content, so their trie
+    // leaves and the two sibling branch nodes are content-identical at
+    // distinct paths. The corpus keeps each encoding once and traversal
+    // still resolves every receipt.
+    const base = {
+      type: 2,
+      status: 1,
+      cumulativeGasUsed: 21_000n,
+      logsBloom: `0x${"00".repeat(256)}` as Hex,
+      logs: [],
+    };
+    const receipts: IndexedBlockReceipt[] = [256, 257, 512, 513].map((transactionIndex) => ({
+      transactionIndex,
+      ...base,
+    }));
+    const nodes = hashedTrieNodes(receipts);
+    const hashes = nodes.map((node) => keccak256(node));
+    // Eight nodes are visited (root, two inner branches, four leaves);
+    // five encodings are unique.
+    expect(nodes.length).toBe(5);
+    expect(new Set(hashes).size).toBe(hashes.length);
+    for (let i = 1; i < hashes.length; i += 1) {
+      expect(hashes[i - 1]! < hashes[i]!).toBe(true);
+    }
+    const trie = new ReceiptsTrie(receipts);
+    expect(hashes).toContain(trie.root());
+    for (const receipt of receipts) {
+      expect(trie.value(receipt.transactionIndex)).toBe(encodeReceipt(receipt));
+    }
   });
 });
 

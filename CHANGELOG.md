@@ -1,5 +1,12 @@
 # Releases
 
+## 0.1.0-node.20260913a
+
+- Import Qwen's exact 115fbcd/00d0796 history: shared-node deduplication, temporary
+  frame cleanup, diagnostic documentation and a native evaluation example.
+- Preserve remaining owner gates for full-width encoder validation and removal
+  of the arbitrary capture receipt cap. No 32-block job was duplicated.
+
 ## 0.1.0-node.20260912g
 
 - Correct EIP-1559 preflight to permit clipping the priority fee by the max-fee

@@ -1,6 +1,8 @@
-# Node validation — 0.1.0-node.20260912g
+# Node validation — 0.1.0-node.20260913a
 
-35 focused private tests pass. They cover generated ABI/metadata correspondence,
+35 focused private node tests and 2 targeted imported F1/F4 regressions pass. The
+38 other tests in those two imported files were deliberately outside that focused
+run. They cover generated ABI/metadata correspondence,
 4352-byte terms, 800-byte journals/356-byte EVM encoding, exact uint64 values,
 context/manifest resume, content corruption, failure atomicity, reorg invalidation,
 explicit candidate retry, real cgroup limits, role/adjacency/sum rules, linked
@@ -32,8 +34,9 @@ The range guest was rebuilt after the host-only lock/version change and is
 byte-identical: `1d9d837677c3f363f3b7a0ee9f7117a3d1cdbc23d0c18df61727fe6872a8aadd`.
 All 68 reviewed guest/core/range/build files and workspace package metadata retain
 their original bytes. The VERSION marker now agrees with guest workspace e. The validated host remains
-release f; node/CLI release g changes only the EIP-1559 tip-cap preflight after the
-initial integration commit. Original chunk source c,
+release f. Release g fixed EIP-1559 tip-cap preflight; node release 20260913a
+imports Qwen 115fbcd/00d0796 and the completed guest-toolchain locator. A cached
+guest rebuild after the new native example still matched the original ELF. Original chunk source c,
 ELF, program keys and proof statement are not relabelled.
 
 The final saved bundle remains
@@ -56,3 +59,17 @@ No additional agents, A2A/Brain/taskboard calls, new capture/proving/GPU jobs,
 signing, chain transactions, deployment, PR or push were performed. Owner gates
 are listed in [the setup guide](public-sp1-node.md). Full-window feasibility and
 real deployed financial acceptance remain unestablished.
+
+The 115fbcd import had one README conflict. The integration retains the SP1 node
+entry point, historical receipt separation and selected reserve/refund policy;
+Qwen-owned code and his diagnostic documentation changes are imported unchanged.
+F2/F3 remain open. No 32-block capture or diagnostic execution was repeated. The
+new native example is outside the guest dependency code. All existing reviewed
+guest/build files remain unchanged.
+
+The supplied locator report SHA256
+`8114d6f57bd8c442b21070ea299bd02acdf0bdd775fc869abb8d0cb68cf22942`
+was matched by Root. It reports whole-tree guest-toolchain identity and a matching
+public cargo-prove binary. This task consumed that evidence without downloading
+or installing toolchains. Compiler-from-source and whole-image/host-helper
+reproduction are distinct unclosed claims.

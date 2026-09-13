@@ -279,9 +279,13 @@ export class ReceiptsTrie {
       const encoded = encodeNode(node);
       if (byteLength(encoded) >= 32) {
         const hash = keccak256(encoded);
-        if (seen.has(hash)) fail();
-        seen.add(hash);
-        out.push(encoded);
+        // Identical content at distinct trie paths is one corpus entry.
+        // Traversal continues so every path is still walked; the
+        // isomorphic subtree adds no new encodings.
+        if (!seen.has(hash)) {
+          seen.add(hash);
+          out.push(encoded);
+        }
       }
       if (node.kind === "leaf") return;
       if (node.kind === "extension") {

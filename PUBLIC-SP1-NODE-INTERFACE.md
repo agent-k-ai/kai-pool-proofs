@@ -1,6 +1,6 @@
 # Public SP1 node interface — integration contract
 
-Release: 0.1.0-node.20260912g. Local integration only; no publication or deployment.
+Release: 0.1.0-node.20260913a. Local integration only; no publication or deployment.
 
 The new `volume-sp1-node` executable is separate from the receipt-diagnostic CLI.
 Its flow is inspect -> init -> capture/resume -> frames -> prove/resume -> verify ->
@@ -20,7 +20,8 @@ endpoint requires a new immutable context. A changed wallet does not change the
 proof beneficiary. Zero tallies and losing entrant units remain eligible.
 
 Capture consumes the reviewed `captureChunkFrames` interface in bounded pieces,
-with explicit missing intervals. The Qwen correction is pending; no edits to
+with explicit missing intervals. Qwen F1/F4 corrections through 115fbcd are imported; full-width encoder and
+receipt-cap corrections remain pending. No integration-authored edits to
 `chunk-frame.ts` are owned by this integration. The full window is tiled exactly.
 Proof trees use compressed chunk/range children; unary is chunk-only, binary is
 nonempty, adjacent, strictly shorter, and context/key preserving. The final root
@@ -72,3 +73,10 @@ The node gets release g; no guest package version, guest source, ELF, VK,
 old proof context or original diagnostic evidence is relabelled. The host package retains validated release f while the guest workspace stays e. Host-only
 changes receive independent compilation/verification. The retained two-block proof remains
 diagnostic. Full-window feasibility and deployed financial acceptance remain gates.
+
+Final capture import checkpoint: exact author commits 00d0796 and 115fbcd are
+preserved as merge ancestry. One README conflict was resolved by retaining the
+SP1 node entry point, historical receipt separation and selected funding policy.
+Qwen-owned code is imported byte-for-byte. Public guest compiler/CLI locators are
+now supplied and byte-compared by their owner; full host/helper/composite-image
+bootstrap remains unverified. See the setup guide for exact URLs and hashes.

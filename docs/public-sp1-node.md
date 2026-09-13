@@ -1,6 +1,6 @@
 # Own-RPC / own-wallet SP1 VOLUME node
 
-Release **0.1.0-node.20260912g**. This source integrates the real chunk/range CPU
+Release **0.1.0-node.20260913a**. This source integrates the real chunk/range CPU
 producers and protocol-7 production interfaces. Its financial path accepts only
 a full supported race interval, never receipt diagnostics or the saved two-block
 proof. No deployment, approved live configuration, full-window throughput or
@@ -53,14 +53,39 @@ as sufficient verification. Acquire caches explicitly from approved upstream
 sources; hashes identify bytes, not ceremony trust. Locked Cargo and Go builds
 fail when dependencies are absent instead of upgrading or fetching replacements.
 
-**Remaining bootstrap gate:** the exact retained compiler reports
-`rustc 1.94.0-dev` with an unknown compiler commit. A publicly resolvable,
-checksum-pinned distribution/source-build locator for that exact compiler and
-helper is not included in the supplied handoff. Do not substitute a latest
-installer or assume an internal image ID is a public distribution. These commands
-are independent of operator hosts/paths once the pinned prerequisites are
-installed; a completely new machine bootstrap remains unverified until that
-locator is supplied and checked.
+**Public guest compiler and CLI locators:** the supplied toolchain owner report
+now byte-matches the official guest toolchain (all 179 files) and cargo-prove CLI
+to the retained environment. The guest fork tag is `succinct-1.94.0-64bit`, commit
+`c7149403db5f6f72f410d6dffcee90378235f23b`; SP1 v6.7.0 explicitly pins that tag.
+Archive identities are recorded in `NODE-BUILD-REFERENCE.json`:
+
+```sh
+curl --fail --location --max-filesize 536870912 \
+  --output "$SP1_GUEST_ARCHIVE" \
+  https://github.com/succinctlabs/rust/releases/download/succinct-1.94.0-64bit/rust-toolchain-x86_64-unknown-linux-gnu.tar.gz
+printf '%s  %s\n' 12c94435d41bfe4e20131bbcce40b35abd32270ad792befc653af4e3fabc192f "$SP1_GUEST_ARCHIVE" | sha256sum --check
+```
+
+The archive is 384,963,362 bytes. Extract the checked archive into a new local
+directory, set the tool paths in `environment.local.json`, and link its directory
+containing `bin/rustc` as your `succinct` rustup toolchain. Run the environment
+checker before building. The public CLI archive is
+`https://github.com/succinctlabs/sp1/releases/download/v6.7.0/cargo_prove_v6.7.0_linux_amd64.tar.gz`,
+21,179,842 bytes, SHA-256
+`ef13dff30388137c5fe214011a67a5f53d1b520b64be741a9865ef12bd8c54ea`;
+its extracted binary hashes to
+`c957c0cc692e68f24c337103abcc292bd7f35d659399850d7d28ed143114c1ab`.
+These comparisons are attributed to the supplied owner report; this node task
+made no toolchain download or installation. The guest archive hash was computed
+by that owner; upstream does not publish an adjacent checksum file.
+
+**Remaining bootstrap gate:** the composite validation image has no public
+RepoDigest or committed reconstruction Dockerfile. Host-side components/helper
+reproduction are not fully byte-verified by the locator report. Its guest compiler
+comparison does not establish all host/tool/image identities. Public native builds
+use the explicit component pins and the user's own paths; a clean new-machine
+host/helper bootstrap still needs verification. Do not substitute a latest
+installer or use an internal image ID as a required public distribution.
 
 Build both guests and the new hosts from a clean checkout. Set the environment
 variables required by `scripts/sp1-build-source.sh` to **your own** verified
@@ -222,11 +247,14 @@ No fee-service/venue-readiness or live-history requirement is added to exit path
 
 ## Remaining gates
 
-Qwen's capture corrections (shared-node deduplication, complete object width/
-uint64 validation, removal of the arbitrary receipt cap and temporary-file cleanup)
-remain outside this integration's ownership until Root supplies the corrective
-commit. Contract AC-1 and deployment-identity refresh remain with their owner.
-The quarantined Solidity merge helper is not a dependency of this node.
+Qwen's exact committed `115fbcd4093f199653f008b9a3be21846212c900` /
+`00d07963d368c4d70b66230572e2796b9a3e6ba9` corrections are imported: shared-node
+deduplication, temporary-file cleanup, diagnostic documentation and a native
+helper example. Full object width/bigint validation and removal of the arbitrary
+receipt cap remain open with Qwen. The node has not duplicated his 32-block
+native diagnostic. Its native result is not a new SP1 proof or production context.
+Contract AC-1 and deployment-identity refresh remain with their owner. The
+quarantined Solidity merge helper is not a dependency of this node.
 
 A newly proven full 36,000-block race, actual approved deployed suite/context,
 canonical acceptance, all-entrant quiet closure, earned payment and measured

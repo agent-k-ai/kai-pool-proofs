@@ -6,7 +6,7 @@
   "cargoVersion": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
   "rustcVersion": "1.94.0-dev (compiler commit reported unknown)",
   "goVersion": "1.24.13",
-  "toolchainDistribution": "public distribution locator for this exact compiler remains a release gate; do not substitute a latest installer",
+  "toolchainDistribution": "Guest compiler and CLI public archives byte-compared by the supplied owner report; host/helper/composite fresh bootstrap remains a separate gate.",
   "tools": {
     "rustc": {
       "sha256": "2e952f92635ee0388b5eac9b06f2fec7b23a620b0a7dbcceab576caeb89cb160"
@@ -36,5 +36,22 @@
     "sourceCommit": "9a12b81f3587ccc4e903593fbd52c5ebeb7349eb",
     "sha256": "1d9d837677c3f363f3b7a0ee9f7117a3d1cdbc23d0c18df61727fe6872a8aadd",
     "programVKey": "0x00f9a794e2d64a86dca48bb66e37b7ee87294a7fac27fdecbbd5bd0f41f6c00a"
+  },
+  "publicGuestToolchain": {
+    "sourceCommit": "c7149403db5f6f72f410d6dffcee90378235f23b",
+    "tag": "succinct-1.94.0-64bit",
+    "url": "https://github.com/succinctlabs/rust/releases/download/succinct-1.94.0-64bit/rust-toolchain-x86_64-unknown-linux-gnu.tar.gz",
+    "bytes": 384963362,
+    "sha256": "12c94435d41bfe4e20131bbcce40b35abd32270ad792befc653af4e3fabc192f",
+    "treeFiles": 179,
+    "treeAggregateSha256": "73e0ee663297b86385c452d3dcbfa8d2e6896c5be1fe5223e591369287d78c60",
+    "evidence": "supplied owner comparison, not independently downloaded in this node task",
+    "ownerReportSha256": "8114d6f57bd8c442b21070ea299bd02acdf0bdd775fc869abb8d0cb68cf22942"
+  },
+  "publicSp1Cli": {
+    "url": "https://github.com/succinctlabs/sp1/releases/download/v6.7.0/cargo_prove_v6.7.0_linux_amd64.tar.gz",
+    "bytes": 21179842,
+    "archiveSha256": "ef13dff30388137c5fe214011a67a5f53d1b520b64be741a9865ef12bd8c54ea",
+    "binarySha256": "c957c0cc692e68f24c337103abcc292bd7f35d659399850d7d28ed143114c1ab"
   }
 }

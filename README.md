@@ -1,6 +1,6 @@
 # kai-pool-proofs
 
-Open-source, independently runnable **VOLUME** proof-submission code for
+Open-source **SP1 VOLUME node** source and receipt diagnostic utilities for
 prediction pools on Robinhood testnet `46630`.
 
 The SP1 node uses your own RPC and injected wallet to capture complete race
@@ -9,10 +9,10 @@ and prepare/broadcast/confirm protocol-7 submissions, closure and earned claims.
 See **[the public SP1 node setup and commands](docs/public-sp1-node.md)** and
 [the integration interface](PUBLIC-SP1-NODE-INTERFACE.md).
 
-Release **0.1.0-node.20260912g** imports the reviewed range producer and generated
+Release **0.1.0-node.20260913a** imports the reviewed range producer and generated
 production adapter/controller/pool ABI. Full-window proving feasibility and live
-financial acceptance remain unverified. The pinned-toolchain distribution locator,
-Qwen's capture corrections and the final contract AC-1 identity refresh remain
+financial acceptance remain unverified. Host/helper bootstrap, Qwen's remaining full-width/receipt-cap corrections,
+and the final contract AC-1 identity refresh remain
 explicit gates in the setup guide. No private application repository, operator
 database, A2A service, operator wallet or internal machine path is a runtime input.
 
