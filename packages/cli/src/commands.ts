@@ -15,7 +15,7 @@
  *
  * Apache-2.0. Copyright 2026 Alpha Tech Organization.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import {
   decodeEventLog,
   encodeFunctionData,
@@ -33,15 +33,20 @@ import {
   buildActivityProofs,
   buildReceiptProof,
   batchActivityProofs,
+  captureChunkFrames,
   captureReceiptBlock,
   decodeReceipt,
   decodeRobinhoodHeader,
+  decodeTermsAbi,
+  encodeFrameFile,
   encodeReceipt,
   ponsActivityRaceAdapterAbi,
   ponsActivityRaceControllerV2Abi,
+  termsHash,
   verifyReceiptLog,
   verifyReceiptProof,
   type CapturedReceiptBlock,
+  type ChunkContext,
   type PonsActivityMetric,
   type ReadRpc,
   type SwapCandidate,
@@ -606,4 +611,65 @@ export async function claimBounty(
     throw new Error("SEND_HASH_MISMATCH: the node accepted a hash that does not match the signed bytes");
   }
   return { txHash, state: "broadcast" };
+}
+
+export interface CaptureChunkArgs {
+  termsPath: string;
+  beneficiary: Address;
+  coverageMask: number;
+  fromExclusive: number;
+  toInclusive: number;
+  beforeHash: Hex;
+  endHash: Hex;
+  outPath: string;
+}
+
+/** Reads a 4,352-byte terms ABI as raw bytes or 8,706 hex characters. */
+function readTermsFile(path: string): Hex {
+  let raw: Buffer;
+  try {
+    raw = readFileSync(path);
+  } catch {
+    throw new Error(`CLI_USAGE: cannot read --terms file ${path}`);
+  }
+  const text = raw.toString("utf8").trim();
+  if (/^0x[0-9a-fA-F]+$/.test(text) && (text.length - 2) / 2 === 4352) return text as Hex;
+  if (raw.length === 4352) return `0x${raw.toString("hex")}` as Hex;
+  throw new Error("CLI_USAGE: --terms must be 4352 raw bytes or 8706 hex characters");
+}
+
+/**
+ * Captures the V1 chunk frame sequence from the user's own RPC and writes
+ * it atomically. Capture/export only: the frames are guest input, not a
+ * proof; nothing is signed or broadcast.
+ */
+export async function captureChunk(ctx: CommandContext, args: CaptureChunkArgs): Promise<unknown> {
+  const terms = decodeTermsAbi(readTermsFile(args.termsPath));
+  const context: ChunkContext = {
+    terms,
+    beneficiary: getAddress(args.beneficiary),
+    coverageMask: args.coverageMask,
+    fromExclusive: args.fromExclusive,
+    toInclusive: args.toInclusive,
+    beforeHash: args.beforeHash,
+    endHash: args.endHash,
+  };
+  const captured = await captureChunkFrames({
+    rpc: ctx.rpc,
+    chainId: ctx.config.chainId,
+    context,
+  });
+  const file = encodeFrameFile(captured.frames);
+  const tmp = `${args.outPath}.tmp-${process.pid}`;
+  writeFileSync(tmp, file);
+  renameSync(tmp, args.outPath);
+  return {
+    mode: "capture-chunk",
+    note: "capture/export only; frames are guest input, not a proof; nothing was signed or broadcast",
+    file: args.outPath,
+    fileBytes: file.length,
+    frames: captured.frames.length,
+    termsHash: termsHash(terms),
+    blocks: captured.blocks,
+  };
 }

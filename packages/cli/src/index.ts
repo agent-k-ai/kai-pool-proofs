@@ -11,6 +11,9 @@
  *   volume-proof submit  --config cfg.json --race 46630:0xC:1 --plan plan.json --entrants '[...]' --gas-price 1000000000 [--batch 0]
  *   volume-proof confirm --config cfg.json --tx 0xH --adapter 0xA
  *   volume-proof claim   --config cfg.json --race 46630:0xC:1 --receiver 0xR --gas-price 1000000000
+ *   volume-proof capture-chunk --config cfg.json --terms terms.hex --beneficiary 0xB \
+ *      --coverage-mask 15 --from-exclusive 100 --to-inclusive 101 \
+ *      --before-hash 0xH --end-hash 0xH --out chunk.frames
  *
  * Output is JSON on stdout with decimal-string quantities. Errors are
  * JSON on stderr with a non-zero exit code. Own RPC and own wallet only;
@@ -25,6 +28,7 @@ import { loadPublicConfig } from "./config.js";
 import {
   claimBounty,
   confirmSubmission,
+  captureChunk,
   fetchBlock,
   inspect,
   makeRpc,
@@ -176,6 +180,27 @@ async function run(argv: string[]): Promise<unknown> {
       const race = parseRaceKey(flag(flags, "race"));
       const gasPrice = BigInt(flag(flags, "gas-price"));
       return claimBounty({ config, rpc, signer }, race, flag(flags, "receiver") as Address, gasPrice);
+    }
+    case "capture-chunk": {
+      const coverageMask = Number(flag(flags, "coverage-mask"));
+      const fromExclusive = Number(flag(flags, "from-exclusive"));
+      const toInclusive = Number(flag(flags, "to-inclusive"));
+      if (!Number.isInteger(coverageMask) || coverageMask < 1 || coverageMask > 255) {
+        throw new Error("CLI_USAGE: --coverage-mask must be an integer in 1..255");
+      }
+      if (!Number.isSafeInteger(fromExclusive) || !Number.isSafeInteger(toInclusive)) {
+        throw new Error("CLI_USAGE: --from-exclusive/--to-inclusive must be safe integers");
+      }
+      return captureChunk({ config, rpc, signer }, {
+        termsPath: flag(flags, "terms"),
+        beneficiary: flag(flags, "beneficiary") as Address,
+        coverageMask,
+        fromExclusive,
+        toInclusive,
+        beforeHash: flag(flags, "before-hash") as Hex,
+        endHash: flag(flags, "end-hash") as Hex,
+        outPath: flag(flags, "out"),
+      });
     }
     default:
       throw new Error(`CLI_USAGE: unknown command ${command || "(none)"}`);

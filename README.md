@@ -125,6 +125,9 @@ volume-proof rewards --config cfg.json --race 46630:0xC:1 --prover 0xP
 volume-proof submit  --config cfg.json --race 46630:0xC:1 --plan plan.json --entrants '["0xA","0xB"]' --gas-price 1000000000
 volume-proof confirm --config cfg.json --tx 0xH --adapter 0xA
 volume-proof claim   --config cfg.json --race 46630:0xC:1 --receiver 0xR --gas-price 1000000000
+volume-proof capture-chunk --config cfg.json --terms terms.hex --beneficiary 0xB \
+  --coverage-mask 15 --from-exclusive 100 --to-inclusive 101 \
+  --before-hash 0xH --end-hash 0xH --out chunk.frames
 ```
 
 Output is JSON on stdout; errors are JSON on stderr with a non-zero exit
@@ -170,15 +173,64 @@ Rules:
   testnet) as separate fields. Native quote units stay separate from
   payout collateral.
 
+## Chunk capture (SP1 VOLUME guest input)
+
+`capture-chunk` exports the version-1 chunk frame sequence that the SP1
+VOLUME complete-block guest consumes. The frames are guest input, not a
+proof: the command never proves, signs, or broadcasts, and it writes
+nothing on failure. The frame format is fixed in
+`prover/volume-sp1/CHUNK-INTERFACE.md` (0.1.0-eval.20260912c).
+
+File layout: a sequence of `u64 big-endian byte_length || frame_bytes`
+frames, exact EOF required.
+
+- Frame 0 (context, 4,463 bytes): `KAIVOLCH` magic, framing version `1`,
+  the exact 4,352-byte `VolumeTermsV1` ABI (136 words), 20-byte
+  beneficiary, 1-byte nonempty coverage mask, 8-byte `fromExclusive`,
+  8-byte `toInclusive`, 32-byte `beforeHash`, 32-byte `endHash`.
+- Frames 1..N (one per block in `(fromExclusive, toInclusive]`): the full
+  16-field Nitro header RLP, the hashed-node count, and every reachable
+  receipts-trie node whose RLP encoding is at least 32 bytes, each
+  length-prefixed and sorted strictly ascending by Keccak(node bytes).
+  Inline children stay inside their parent; an empty trie carries an
+  empty corpus.
+
+Capture verification, all from the user's own RPC:
+
+- `eth_chainId` must equal the configured chain (46630).
+- Every served block header re-encodes to its served hash (16-field
+  Nitro RLP).
+- Block numbers are contiguous; each parent hash equals the previous
+  block hash; the final hash equals `endHash`.
+- Receipt transaction indices are dense from zero.
+- Every reconstructed receipts root equals the header `receiptsRoot`.
+- Terms decode to exactly 4,352 bytes and pass structural validation
+  (chain, timing, entrant/venue invariants, padding, pool key hashes).
+
+The terms file is 4,352 raw bytes or 8,706 hex characters. The output
+file is written atomically (tmp + rename) only after every check passes.
+
+Byte-for-byte anchor: `fixtures/volume-chunk/` pins the QA block
+117903561 fixture and the golden frames file the guest executed on
+2026-09-12 (exit 0, 800-byte journal). The test suite re-exports the
+frames from the fixture and compares them byte-for-byte.
+
+Decoder reconciliation with the integrated Rust adapter is documented in
+`docs/volume-chunk-decoder-reconciliation.md`.
+
 ## Library functions
 
 `decodeRobinhoodHeader`, `encodeRobinhoodHeader`, `computeReceiptsRoot`,
 `buildReceiptProof`, `verifyReceiptProof`, `verifyReceiptLog`,
 `captureReceiptBlock`, `buildActivityProofs`, `qualifyActivitySwap`,
-`batchActivityProofs`, `naturalKey`, `HttpRpc`. The CLI adds `inspect`,
-`fetchBlock`, `verifyBlock`, `planBlock`, `rewards`, `submitBatch`,
-`confirmSubmission`, and `claimBounty`. All accept injected public/wallet
-clients; there are no environment-specific singletons.
+`batchActivityProofs`, `naturalKey`, `HttpRpc`, `decodeTermsAbi`,
+`encodeTermsAbi`, `termsHash`, `encodeContext`, `decodeContext`,
+`encodeBlockFrame`, `decodeBlockFrame`, `encodeFrameFile`,
+`decodeFrameFile`, `hashedTrieNodes`, `captureChunkFrames`. The CLI adds
+`inspect`, `fetchBlock`, `verifyBlock`, `planBlock`, `rewards`,
+`submitBatch`, `confirmSubmission`, `claimBounty`, and `captureChunk`.
+All accept injected public/wallet clients; there are no
+environment-specific singletons.
 
 ## Tests
 

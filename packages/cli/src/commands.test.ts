@@ -5,9 +5,13 @@
  * Apache-2.0. Copyright 2026 Alpha Tech Organization.
  */
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   encodeAbiParameters,
   encodeFunctionResult,
+  fromRlp,
   keccak256,
   stringToBytes,
   toHex,
@@ -19,16 +23,23 @@ import {
   ReceiptsTrie,
   V4_SWAP_TOPIC,
   activityPoolId,
+  decodeReceipt,
+  decodeRobinhoodHeader,
+  decodeTermsAbi,
+  encodeTermsAbi,
   ponsActivityRaceAdapterAbi,
   ponsActivityRaceControllerV2Abi,
   type ActivityPoolKey,
   type CapturedReceiptBlock,
   type IndexedBlockReceipt,
   type ReadRpc,
+  type RobinhoodRpcBlock,
   type SwapCandidate,
+  type VolumeTermsV1,
 } from "@kai-pool-proofs/volume-proof";
 import { loadPublicConfig } from "./config.js";
 import {
+  captureChunk,
   confirmSubmission,
   inspect,
   planBlock,
@@ -621,5 +632,159 @@ describe("inspect", () => {
     expect(result.proverPool).toBe("456");
     expect(result.totalProofCredits).toBe("789");
     expect(result.venues).toHaveLength(1);
+  });
+});
+describe("captureChunk", () => {
+  const fixtureDir = fileURLToPath(new URL("../../../fixtures/volume-chunk/", import.meta.url));
+  const fixture = JSON.parse(
+    readFileSync(`${fixtureDir}block-117903561-receipt-decoder-fixture.json`, "utf8"),
+  ) as {
+    fixture: {
+      block: { number: number; hash: Hex; receiptsRoot: Hex; canonicalHeaderRlp: Hex };
+      receipts: {
+        transactionIndex: number;
+        type: number;
+        status: number;
+        cumulativeGasUsed: number;
+        logsBloom: Hex;
+        serialized: Hex;
+      }[];
+    };
+  };
+  const GOLDEN = readFileSync(`${fixtureDir}real-block-synthetic-terms.frames`);
+  const TERMS = readFileSync(`${fixtureDir}terms-abi-real.hex`, "utf8").trim() as Hex;
+  const BLOCK = fixture.fixture.block.number;
+
+  function headerToJson(header: Hex): RobinhoodRpcBlock {
+    const fields = fromRlp(header) as Hex[];
+    return {
+      parentHash: fields[0]!,
+      sha3Uncles: fields[1]!,
+      miner: fields[2]!,
+      stateRoot: fields[3]!,
+      transactionsRoot: fields[4]!,
+      receiptsRoot: fields[5]!,
+      logsBloom: fields[6]!,
+      difficulty: fields[7]!,
+      number: fields[8]!,
+      gasLimit: fields[9]!,
+      gasUsed: fields[10]!,
+      timestamp: fields[11]!,
+      extraData: fields[12]!,
+      mixHash: fields[13]!,
+      nonce: fields[14]!,
+      baseFeePerGas: fields[15]!,
+      hash: keccak256(header),
+    };
+  }
+
+  function receiptJsons(): unknown[] {
+    return fixture.fixture.receipts.map((receipt) => ({
+      transactionIndex: `0x${receipt.transactionIndex.toString(16)}`,
+      type: `0x${receipt.type.toString(16).padStart(2, "0")}`,
+      status: `0x${receipt.status.toString(16)}`,
+      cumulativeGasUsed: `0x${receipt.cumulativeGasUsed.toString(16)}`,
+      logsBloom: receipt.logsBloom,
+      logs: decodeReceipt(receipt.serialized).logs.map((log) => ({
+        address: log.address,
+        topics: [...log.topics],
+        data: log.data,
+      })),
+    }));
+  }
+
+  function captureRpc(): ReadRpc {
+    const block = headerToJson(fixture.fixture.block.canonicalHeaderRlp);
+    const receipts = receiptJsons();
+    return {
+      request: async <T>(method: string, params: unknown[]): Promise<T> => {
+        if (method === "eth_chainId") return "0xb626" as T;
+        if (method === "eth_getBlockByNumber") return block as T;
+        if (method === "eth_getBlockReceipts") return receipts as T;
+        throw new Error(`UNEXPECTED_METHOD_${method}`);
+      },
+      head: async () => ({ number: 0n, hash: "0x00", parentHash: "0x00", timestamp: 0n }),
+      block: async () => {
+        throw new Error("NOT_USED");
+      },
+    };
+  }
+
+  function shiftedTerms(): VolumeTermsV1 {
+    const terms = decodeTermsAbi(TERMS);
+    const shift = BLOCK - 1 - terms.startBlock;
+    terms.startBlock += shift;
+    terms.snapshotBlock += shift;
+    terms.bettingCutoff += shift;
+    terms.submissionDeadline += shift;
+    terms.terminalExpiry += shift;
+    return terms;
+  }
+
+  it("writes the golden-compatible frame file and reports the summary", async () => {
+    const terms = shiftedTerms();
+    const parent = decodeRobinhoodHeader(fixture.fixture.block.canonicalHeaderRlp).parentHash;
+    const dir = mkdtempSync(join(process.cwd(), "capture-chunk-test-"));
+    try {
+      const termsPath = join(dir, "terms.hex");
+      writeFileSync(termsPath, encodeTermsAbi(shiftedTerms()));
+      const outPath = join(dir, "chunk.frames");
+      const config = loadPublicConfig({ rpcUrls: ["http://127.0.0.1:1"], chainId: 46630 });
+      const ctx: CommandContext = { config, rpc: captureRpc() };
+      const result = (await captureChunk(ctx, {
+        termsPath,
+        beneficiary: `0x${"42".repeat(20)}`,
+        coverageMask: 15,
+        fromExclusive: BLOCK - 1,
+        toInclusive: BLOCK,
+        beforeHash: parent,
+        endHash: fixture.fixture.block.hash,
+        outPath,
+      })) as {
+        mode: string;
+        fileBytes: number;
+        frames: number;
+        blocks: { number: number; receiptCount: number; nodeCount: number }[];
+      };
+      expect(result.mode).toBe("capture-chunk");
+      expect(result.frames).toBe(2);
+      expect(result.blocks).toEqual([
+        {
+          number: BLOCK,
+          hash: fixture.fixture.block.hash,
+          receiptsRoot: fixture.fixture.block.receiptsRoot,
+          receiptCount: 2,
+          nodeCount: 3,
+        },
+      ]);
+      expect(readFileSync(outPath)).toEqual(GOLDEN);
+      expect(result.fileBytes).toBe(GOLDEN.length);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a terms file with the wrong size", async () => {
+    const dir = mkdtempSync(join(process.cwd(), "capture-chunk-test-"));
+    try {
+      const termsPath = join(dir, "terms.hex");
+      writeFileSync(termsPath, "0x1234");
+      const config = loadPublicConfig({ rpcUrls: ["http://127.0.0.1:1"], chainId: 46630 });
+      const ctx: CommandContext = { config, rpc: captureRpc() };
+      await expect(
+        captureChunk(ctx, {
+          termsPath,
+          beneficiary: `0x${"42".repeat(20)}`,
+          coverageMask: 15,
+          fromExclusive: BLOCK - 1,
+          toInclusive: BLOCK,
+          beforeHash: "0x0000000000000000000000000000000000000000000000000000000000000001",
+          endHash: "0x0000000000000000000000000000000000000000000000000000000000000002",
+          outPath: join(dir, "chunk.frames"),
+        }),
+      ).rejects.toThrow("CLI_USAGE");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

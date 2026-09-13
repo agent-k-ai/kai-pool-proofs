@@ -28,7 +28,9 @@
       "lines": 169,
       "targetPath": "packages/volume-proof/src/ethereum-state-proof.ts",
       "license": "Apache-2.0 (parent); MPT verification logic ported from MIT Optimism trie libraries pinned at 29bec1e4d0e9ab90f9132e418cdc2b0f9756483c",
-      "imports": ["viem"],
+      "imports": [
+        "viem"
+      ],
       "couplingToRemove": "none (pure)",
       "status": "extracted"
     },
@@ -38,7 +40,10 @@
       "lines": 351,
       "targetPath": "packages/volume-proof/src/receipt-proof.ts",
       "license": "Apache-2.0 (parent)",
-      "imports": ["viem", "./ethereum-state-proof.js"],
+      "imports": [
+        "viem",
+        "./ethereum-state-proof.js"
+      ],
       "couplingToRemove": "none (pure)",
       "status": "extracted"
     },
@@ -48,7 +53,9 @@
       "lines": 67,
       "targetPath": "packages/volume-proof/src/bounded-json-rpc.ts",
       "license": "Apache-2.0 (parent)",
-      "imports": ["viem"],
+      "imports": [
+        "viem"
+      ],
       "couplingToRemove": "none (pure bounded fetch wrapper)",
       "status": "extracted"
     },
@@ -58,7 +65,9 @@
       "lines": 670,
       "targetPath": "packages/volume-proof/src/nitro-header.ts",
       "license": "Apache-2.0 (parent)",
-      "imports": ["viem"],
+      "imports": [
+        "viem"
+      ],
       "couplingToRemove": "hard-coded chain defaults and full block-proof orchestration dropped; the fixed 16-field Nitro RLP header codec (encodeRobinhoodHeader/decodeRobinhoodHeader) kept as the portable header codec",
       "status": "extracted"
     },
@@ -68,7 +77,9 @@
       "lines": 297,
       "targetPath": "packages/volume-proof/src/activity-qualification.ts",
       "license": "Apache-2.0 (parent)",
-      "imports": ["viem"],
+      "imports": [
+        "viem"
+      ],
       "couplingToRemove": "hard-coded Robinhood mainnet addresses become injected config; volume qualification logic, Swap log decoding, entrant-order checks, and native address(0) handling kept. minNotional lookup made case-insensitive to match on-chain address mapping semantics (documented improvement over the parent constant-table lookup).",
       "status": "extracted"
     },
@@ -78,7 +89,11 @@
       "lines": 148,
       "targetPath": "packages/volume-proof/src/receipt-capture.ts",
       "license": "Apache-2.0 (parent)",
-      "imports": ["viem", "./rpc.js (ReadRpc type)", "./receipt-proof.js"],
+      "imports": [
+        "viem",
+        "./rpc.js (ReadRpc type)",
+        "./receipt-proof.js"
+      ],
       "couplingToRemove": "internal SDK import removed; globalLogIndex, receiptLocalIndex, captureReceiptBlock (injected ReadRpc), and buildActivityProofs kept",
       "status": "extracted"
     },
@@ -88,7 +103,10 @@
       "lines": 138,
       "targetPath": "packages/volume-proof/src/rpc.ts",
       "license": "Apache-2.0 (parent)",
-      "imports": ["viem", "./bounded-json-rpc.js"],
+      "imports": [
+        "viem",
+        "./bounded-json-rpc.js"
+      ],
       "couplingToRemove": "ReadRpc port interface and HttpRpc client kept; operator endpoint defaults dropped",
       "status": "extracted"
     },
@@ -98,7 +116,9 @@
       "lines": 114,
       "targetPath": "packages/volume-proof/src/batching.ts",
       "license": "Apache-2.0 (parent)",
-      "imports": ["viem"],
+      "imports": [
+        "viem"
+      ],
       "couplingToRemove": "DB persistence dropped; pure Swap proof batching logic kept",
       "status": "extracted"
     },
@@ -108,7 +128,9 @@
       "lines": 148,
       "targetPath": "packages/volume-proof/src/identity.ts",
       "license": "Apache-2.0 (parent)",
-      "imports": ["viem"],
+      "imports": [
+        "viem"
+      ],
       "couplingToRemove": "database row schemas dropped; naturalKey and safeNumber kept",
       "status": "extracted"
     }
@@ -137,6 +159,36 @@
       "origin": "public chain data",
       "note": "Real Robinhood testnet 46630 block fixture (header + receipts) captured from public RPC for offline tests. Public on-chain data; no secrets.",
       "license": "public chain data"
+    },
+    {
+      "path": "packages/volume-proof/src/chunk-frame.ts",
+      "origin": "new (public repo)",
+      "note": "V1 chunk framing for the SP1 VOLUME complete-block guest per prover/volume-sp1/CHUNK-INTERFACE.md (0.1.0-eval.20260912c): 4,463-byte context frame, 4,352-byte VolumeTermsV1 ABI, complete-block frames with the hashed-node corpus, u64-BE file framing, own-RPC capture with full verification, and the guest receipt-compatibility check. Capture/export only; no proof, signing, or broadcast.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "packages/volume-proof/src/chunk-frame.test.ts",
+      "origin": "new (public repo)",
+      "note": "Tests: terms ABI strictness, context/block/file framing, golden byte-for-byte re-export, hashed-node corpus, guest receipt compatibility, mock-RPC capture happy path and every mismatch code.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "fixtures/volume-chunk/",
+      "origin": "public chain data + guest execution artifact",
+      "note": "QA block 117903561 receipt decoder fixture, real-block synthetic-terms golden frames (6,525 bytes) and journal (800 bytes) from the 2026-09-12 guest execution (exit 0), and the 4,352-byte real terms ABI. Provenance table in fixtures/volume-chunk/README.md.",
+      "license": "public chain data"
+    },
+    {
+      "path": "prover/",
+      "origin": "imported (bundle, same parent repo)",
+      "note": "Rust SP1 prover tree imported from refs/bundles/core (head 6da6420e9f82aa7946fe267bee2d2eb3365f3c8a) and refs/bundles/chunk (head 3cbabe7907c6b2ba3c498a54e2c977cbab2e17c1). Read-only reference for the frame contract; not part of the TS build.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "docs/volume-chunk-decoder-reconciliation.md",
+      "origin": "new (public repo)",
+      "note": "Reconciliation of the standalone receipt-decoded crate (62f7b15) with the integrated chunk adapter (3cbabe7) and the TS capture path; documents the three acceptance divergences and the capture-side enforcement.",
+      "license": "Apache-2.0"
     }
   ],
   "abiBridge": {
@@ -144,9 +196,22 @@
     "status": "implemented-pending-lenny-artifacts"
   },
   "dependencies": [
-    { "name": "viem", "version": "2.56.1", "license": "MIT" },
-    { "name": "zod", "version": "4.5.4", "license": "MIT" },
-    { "name": "@types/node", "version": "^24.0.0", "license": "MIT", "scope": "dev" }
+    {
+      "name": "viem",
+      "version": "2.56.1",
+      "license": "MIT"
+    },
+    {
+      "name": "zod",
+      "version": "4.5.4",
+      "license": "MIT"
+    },
+    {
+      "name": "@types/node",
+      "version": "^24.0.0",
+      "license": "MIT",
+      "scope": "dev"
+    }
   ],
   "excluded": [
     "operator Postgres schema and dumps",
