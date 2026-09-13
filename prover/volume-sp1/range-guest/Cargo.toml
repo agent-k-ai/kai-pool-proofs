@@ -1,0 +1,10 @@
+[package]
+name = "volume-range-guest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+sp1-zkvm = { version = "=6.7.0", features = ["verify"] }
+kai-volume-range = { path = "../range" }

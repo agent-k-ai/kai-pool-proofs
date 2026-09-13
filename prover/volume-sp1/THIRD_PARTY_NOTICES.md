@@ -20,3 +20,9 @@ The fixture at block117903561 is captured public-chain data, including actual ty
 receipt-zero cumulative gas and agreement with the header's receiptsRoot. It is not
 a deployed race fixture. Diagnostic terms/code identities and all fabricated headers,
 failed receipts, malformed payloads and large logs are explicitly synthetic.
+# Official generic EVM verifier
+
+`evm/sources/` and `evm/SP1Verifier.json` retain the MIT-licensed Succinct
+sp1-contracts v6.1.1 generic verifier for circuit v6.1.0, revision
+`d3629729c3216eb51bd4859d027a8eb729399fa4`. Source notices remain in the files;
+`evm/SOURCE.json` records source, compiler and retained runtime provenance.

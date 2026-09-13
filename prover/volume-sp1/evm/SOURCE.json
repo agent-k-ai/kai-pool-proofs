@@ -1,0 +1,34 @@
+{
+  "upstream": "succinctlabs/sp1-contracts",
+  "contractsTag": "v6.1.1",
+  "revision": "d3629729c3216eb51bd4859d027a8eb729399fa4",
+  "circuit": "v6.1.0",
+  "license": "MIT",
+  "compiler": {
+    "version": "0.8.30+commit.73712a01"
+  },
+  "artifactOrigin": "retained authenticated 20260910 frozen-2 official generic verifier artifact; no PRICE guest or terms reused",
+  "artifactSha256": "55aafe2115507bc8deeb986fd4d6b7f762c78ddd334e66cc7e59f37ea7c3383b",
+  "runtimeSha256": "4f2c196b863276638f1b110af538b3ec13ebd448103eb36ecf3aae28111ee614",
+  "runtimeKeccak256": "3dc2a522cb8c72284d7c48e88a487eacb099c9a95326b712ef2868b08b9c0a54",
+  "sources": [
+    {
+      "originalPath": "experiments/complete-race-proof/contracts/vendor/sp1-contracts-6.1.1/contracts/src/ISP1Verifier.sol",
+      "file": "sources/ISP1Verifier.sol",
+      "sha256": "9e918032a5aa799c1319b14b013154d6a40ca6e5f2267c9f540560abd7fd7689",
+      "keccak256": "9e3ba64860bea920772dcf16be7946de2a2900d80bd51e9c0771184138f4f4d3"
+    },
+    {
+      "originalPath": "experiments/complete-race-proof/contracts/vendor/sp1-contracts-6.1.1/contracts/src/v6.1.0/Groth16Verifier.sol",
+      "file": "sources/v6.1.0/Groth16Verifier.sol",
+      "sha256": "01ab92508b9d56556ee247c7cb6b2ebd9c17835a4618896462b2a3a8708a50bf",
+      "keccak256": "381bc507c23c53a7c9b2b7e6a8e3d3def749b182e58b654c49f11705ffe3de38"
+    },
+    {
+      "originalPath": "experiments/complete-race-proof/contracts/vendor/sp1-contracts-6.1.1/contracts/src/v6.1.0/SP1VerifierGroth16.sol",
+      "file": "sources/v6.1.0/SP1VerifierGroth16.sol",
+      "sha256": "48e1db5baca3b102242ebd88280b3689a088076688146cd0d98876f5dacb76d0",
+      "keccak256": "bb007e568ff2067b328c02d659e1ad234d0cab84e0ffb03bdf76ff8a9123dab4"
+    }
+  ]
+}

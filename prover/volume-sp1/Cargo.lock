@@ -297,6 +297,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.70.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f49d8fed880d473ea71efb9bf597651e77201bdd4893efe54c9e5d65ae04ce6f"
+dependencies = [
+ "bitflags",
+ "cexpr",
+ "clang-sys",
+ "itertools 0.13.0",
+ "log",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash 1.1.0",
+ "shlex 1.3.0",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -419,7 +439,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "005ec2760ca554fae18df7a11195552ec576cd665632a881bc011d5bb2fd4d80"
 dependencies = [
  "find-msvc-tools",
- "shlex",
+ "shlex 2.0.1",
+]
+
+[[package]]
+name = "cexpr"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fac387a98bb7c37292057cffc56d62ecb629900026402633ae9160df93a8766"
+dependencies = [
+ "nom",
 ]
 
 [[package]]
@@ -454,6 +483,17 @@ dependencies = [
  "iana-time-zone",
  "num-traits",
  "windows-link",
+]
+
+[[package]]
+name = "clang-sys"
+version = "1.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "157a8ba7b480713b56f4c09fd13fc3e0a22a5dfab8097ba61cbc5feef950788a"
+dependencies = [
+ "glob",
+ "libc",
+ "libloading",
 ]
 
 [[package]]
@@ -1343,6 +1383,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7"
 
 [[package]]
+name = "glob"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
+
+[[package]]
 name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1762,6 +1808,15 @@ dependencies = [
 
 [[package]]
 name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
@@ -1803,7 +1858,7 @@ dependencies = [
 
 [[package]]
 name = "kai-volume-chunk"
-version = "0.1.0-eval.20260912d"
+version = "0.1.0-eval.20260912e"
 dependencies = [
  "hex",
  "kai-volume-core",
@@ -1814,7 +1869,7 @@ dependencies = [
 
 [[package]]
 name = "kai-volume-core"
-version = "0.1.0-eval.20260912d"
+version = "0.1.0-eval.20260912e"
 dependencies = [
  "kai-volume-primitives",
  "serde_json",
@@ -1822,9 +1877,19 @@ dependencies = [
 
 [[package]]
 name = "kai-volume-primitives"
-version = "0.1.0-eval.20260912d"
+version = "0.1.0-eval.20260912e"
 dependencies = [
  "tiny-keccak",
+]
+
+[[package]]
+name = "kai-volume-range"
+version = "0.1.0-eval.20260912e"
+dependencies = [
+ "hex",
+ "kai-volume-core",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
@@ -1856,6 +1921,16 @@ name = "libc"
 version = "0.2.189"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
+
+[[package]]
+name = "libloading"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
+dependencies = [
+ "cfg-if",
+ "windows-link",
+]
 
 [[package]]
 name = "libm"
@@ -2803,7 +2878,7 @@ dependencies = [
  "pin-project-lite",
  "quinn-proto",
  "quinn-udp",
- "rustc-hash",
+ "rustc-hash 2.1.3",
  "rustls",
  "socket2 0.6.5",
  "thiserror 2.0.20",
@@ -2824,7 +2899,7 @@ dependencies = [
  "rand 0.10.2",
  "rand_pcg",
  "ring",
- "rustc-hash",
+ "rustc-hash 2.1.3",
  "rustls",
  "rustls-pki-types",
  "slab",
@@ -3117,6 +3192,12 @@ checksum = "b74b56ffa8bb2830709a538c2cbcae9aa062db0d2a42563bfb09bdaae44020eb"
 
 [[package]]
 name = "rustc-hash"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
+
+[[package]]
+name = "rustc-hash"
 version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d"
@@ -3394,6 +3475,12 @@ checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
 ]
+
+[[package]]
+name = "shlex"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "shlex"
@@ -4328,6 +4415,7 @@ checksum = "d8d0a94f3da4ae4c075aad9fbf605bdbf23db8106e95037303873272b228366f"
 dependencies = [
  "anyhow",
  "bincode",
+ "bindgen",
  "cfg-if",
  "num-bigint 0.4.8",
  "serde",
@@ -4391,6 +4479,7 @@ dependencies = [
  "sp1-prover",
  "sp1-prover-types",
  "sp1-recursion-executor",
+ "sp1-recursion-gnark-ffi",
  "sp1-verifier",
  "tempfile",
  "thiserror 1.0.69",
@@ -4438,6 +4527,7 @@ dependencies = [
  "libm",
  "rand 0.8.8",
  "sha2",
+ "slop-algebra",
  "sp1-lib",
  "sp1-primitives",
 ]
@@ -5153,14 +5243,14 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "volume-chunk-build"
-version = "0.1.0-eval.20260912d"
+version = "0.1.0-eval.20260912e"
 dependencies = [
  "sp1-build",
 ]
 
 [[package]]
 name = "volume-chunk-guest"
-version = "0.1.0-eval.20260912d"
+version = "0.1.0-eval.20260912e"
 dependencies = [
  "kai-volume-chunk",
  "sp1-zkvm",
@@ -5168,21 +5258,31 @@ dependencies = [
 
 [[package]]
 name = "volume-chunk-host"
-version = "0.1.0-eval.20260912d"
+version = "0.1.0-eval.20260912e"
 dependencies = [
  "bincode",
  "hex",
  "kai-volume-chunk",
+ "kai-volume-core",
+ "kai-volume-range",
  "serde_json",
  "sha2",
- "sp1-sdk",
  "sp1-prover",
+ "sp1-sdk",
  "tokio",
 ]
 
 [[package]]
+name = "volume-range-guest"
+version = "0.1.0-eval.20260912e"
+dependencies = [
+ "kai-volume-range",
+ "sp1-zkvm",
+]
+
+[[package]]
 name = "volume-trie"
-version = "0.1.0-eval.20260912d"
+version = "0.1.0-eval.20260912e"
 dependencies = [
  "hex",
  "kai-volume-primitives",

@@ -1,10 +1,10 @@
 [workspace]
-members = ["primitives", "core", "trie", "chunk", "guest", "host", "build"]
-default-members = ["primitives", "core", "trie", "chunk"]
+members = ["primitives", "core", "trie", "chunk", "range", "guest", "range-guest", "host", "build"]
+default-members = ["primitives", "core", "trie", "chunk", "range"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0-eval.20260912d"
+version = "0.1.0-eval.20260912e"
 edition = "2021"
 license = "Apache-2.0"
 publish = false
