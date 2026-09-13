@@ -80,7 +80,7 @@ const PARENT = decodeRobinhoodHeader(fixture.fixture.block.canonicalHeaderRlp).p
 
 function goldenTerms(): VolumeTermsV1 {
   const terms = decodeTermsAbi(TERMS_ABI_REAL);
-  const shift = BLOCK - 1 - terms.startBlock;
+  const shift = BigInt(BLOCK - 1) - terms.startBlock;
   terms.startBlock += shift;
   terms.snapshotBlock += shift;
   terms.bettingCutoff += shift;
@@ -108,14 +108,38 @@ function fixtureReceipts(): IndexedBlockReceipt[] {
   }));
 }
 
+/** Replaces one 32-byte ABI word (64 hex digits) at a fixed word index. */
+function patchWord(abi: Hex, index: number, value: bigint): Hex {
+  const hex = abi.slice(2);
+  const word = value.toString(16).padStart(64, "0");
+  return `0x${hex.slice(0, index * 64)}${word}${hex.slice((index + 1) * 64)}` as Hex;
+}
+
 describe("terms ABI", () => {
   it("decodes the core real vector and re-encodes it byte-identically", () => {
     const terms = decodeTermsAbi(TERMS_ABI_REAL);
     expect(terms.chainId).toBe(46630);
     expect(terms.entrantCount).toBe(4);
-    expect(terms.startBlock).toBe(1000);
+    expect(terms.startBlock).toBe(1000n);
     expect(terms.venues[0]!.kind).toBe(1);
     expect(encodeTermsAbi(terms)).toBe(lowerHex(TERMS_ABI_REAL));
+  });
+
+  it("enforces uint64/u8 ABI widths and keeps full bigint precision", () => {
+    // A u64 field at or above 2^64 must be refused at encode time.
+    const over = decodeTermsAbi(TERMS_ABI_REAL);
+    over.historyWindow = 2n ** 64n;
+    expect(() => encodeTermsAbi(over)).toThrow("CHUNK_U64_INVALID");
+    // A u8 field at or above 256 must be refused at encode time.
+    const wide = decodeTermsAbi(TERMS_ABI_REAL);
+    wide.collateralDecimals = 256;
+    expect(() => encodeTermsAbi(wide)).toThrow("CHUNK_U8_INVALID");
+    // A u64 above 2^53 decodes exactly as a bigint (no Number precision loss).
+    const big = patchWord(TERMS_ABI_REAL, 124, 2n ** 60n);
+    expect(decodeTermsAbi(big).historyWindow).toBe(2n ** 60n);
+    // Nonzero top 24 bytes in a u64 word are noncanonical and refused.
+    const badWidth = patchWord(TERMS_ABI_REAL, 124, 2n ** 192n);
+    expect(() => decodeTermsAbi(badWidth)).toThrow("CHUNK_TERMS_NONCANONICAL");
   });
 
   it("rejects wrong length, wrong chain, zero identity, bad timing, padding, and venue faults", () => {
@@ -133,10 +157,10 @@ describe("terms ABI", () => {
     bad((t) => (t.domain = `0x${"00".repeat(32)}`));
     bad((t) => (t.startBlock = t.snapshotBlock));
     bad((t) => (t.bettingCutoff = t.startBlock));
-    bad((t) => (t.bettingCutoff = t.snapshotBlock + 1));
-    bad((t) => (t.quietBlocks = 0));
-    bad((t) => (t.historyWindow = 0));
-    bad((t) => (t.confirmationBlocks = t.submissionDeadline - t.snapshotBlock + 1));
+    bad((t) => (t.bettingCutoff = t.snapshotBlock + 1n));
+    bad((t) => (t.quietBlocks = 0n));
+    bad((t) => (t.historyWindow = 0n));
+    bad((t) => (t.confirmationBlocks = t.submissionDeadline - t.snapshotBlock + 1n));
     bad((t) => (t.terminalExpiry = t.submissionDeadline + t.quietBlocks));
     bad((t) => (t.submissionDeadline = t.snapshotBlock + t.historyWindow));
     bad((t) => (t.entrants[4] = "0x1111111111111111111111111111111111111111"));
@@ -196,8 +220,8 @@ describe("context frame", () => {
     bad((c) => (c.coverageMask = 0));
     bad((c) => (c.coverageMask = 17));
     bad((c) => (c.fromExclusive = c.toInclusive));
-    bad((c) => (c.fromExclusive = c.terms.startBlock - 1));
-    bad((c) => (c.toInclusive = c.terms.snapshotBlock + 1));
+    bad((c) => (c.fromExclusive = Number(c.terms.startBlock - 1n)));
+    bad((c) => (c.toInclusive = Number(c.terms.snapshotBlock + 1n)));
     bad((c) => (c.beforeHash = `0x${"00".repeat(32)}`));
     bad((c) => (c.endHash = `0x${"11".repeat(31)}1`));
   });
@@ -645,5 +669,21 @@ describe("captureChunkFrames", () => {
         context: header.context,
       }),
     ).rejects.toThrow("BLOCK_HEADER_HASH_MISMATCH");
+  });
+
+  it("rejects a non-array receipt response; no application receipt cap", async () => {
+    const { context, blocks, receipts } = twoBlockScenario();
+    const inner = captureRpc("0xb626", blocks, receipts);
+    const rpc: ReadRpc = {
+      request: async <T>(method: string, params: unknown[]): Promise<T> => {
+        if (method === "eth_getBlockReceipts") return "not-an-array" as T;
+        return inner.request(method, params);
+      },
+      head: inner.head,
+      block: inner.block,
+    };
+    await expect(
+      captureChunkFrames({ rpc, chainId: 46630, context }),
+    ).rejects.toThrow("CHUNK_RECEIPTS_INVALID");
   });
 });

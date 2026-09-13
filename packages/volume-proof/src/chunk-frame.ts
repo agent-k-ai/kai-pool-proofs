@@ -88,9 +88,21 @@ function i24Word(value: number): Hex {
 }
 
 /** A 32-byte word holding a u64, left padded with zeros. */
-function u64Word(value: number): Hex {
-  if (!Number.isSafeInteger(value) || value < 0) fail("CHUNK_U64_INVALID");
+function u64Word(value: bigint): Hex {
+  if (value < 0n || value >= 2n ** 64n) fail("CHUNK_U64_INVALID");
   return `0x${"00".repeat(24)}${value.toString(16).padStart(16, "0")}`;
+}
+
+/** A 32-byte word holding a u8, left padded with zeros. */
+function u8Word(value: number): Hex {
+  if (!Number.isInteger(value) || value < 0 || value >= 256) fail("CHUNK_U8_INVALID");
+  return `0x${"00".repeat(31)}${value.toString(16).padStart(2, "0")}`;
+}
+
+/** A 32-byte word holding a u24, left padded with zeros. */
+function u24Word(value: number): Hex {
+  if (!Number.isInteger(value) || value < 0 || value >= 2 ** 24) fail("CHUNK_U24_INVALID");
+  return `0x${"00".repeat(29)}${value.toString(16).padStart(6, "0")}`;
 }
 
 /** An 8-byte big-endian unsigned integer (frame length fields). */
@@ -113,12 +125,12 @@ function isHash32(value: Hex): boolean {
 /** One venue word block: 12 ABI words in the exact core order. */
 function venueWords(v: VolumeVenueV1): Hex[] {
   return [
-    word(BigInt(v.kind)),
+    u8Word(v.kind),
     addressWord(v.account),
     lowerHex(v.accountCodeHash),
     addressWord(v.currency0),
     addressWord(v.currency1),
-    word(BigInt(v.fee)),
+    u24Word(v.fee),
     i24Word(v.tickSpacing),
     addressWord(v.hooks),
     lowerHex(v.hookCodeHash),
@@ -159,16 +171,17 @@ export interface VolumeTermsV1 {
   entrantsHash: Hex;
   /** Always length 8; entries past `entrantCount` must be default. */
   venues: VolumeVenueV1[];
-  startBlock: number;
-  snapshotBlock: number;
-  bettingCutoff: number;
-  confirmationBlocks: number;
-  quietBlocks: number;
-  submissionDeadline: number;
-  terminalExpiry: number;
+  /** uint64 in the core ABI; full width, no precision loss. */
+  startBlock: bigint;
+  snapshotBlock: bigint;
+  bettingCutoff: bigint;
+  confirmationBlocks: bigint;
+  quietBlocks: bigint;
+  submissionDeadline: bigint;
+  terminalExpiry: bigint;
   history: Address;
   historyCodeHash: Hex;
-  historyWindow: number;
+  historyWindow: bigint;
   wrappedNative: Address;
   wrappedNativeCodeHash: Hex;
   quoteAsset: Address;
@@ -266,8 +279,8 @@ export function validateTerms(terms: VolumeTermsV1): void {
     terms.startBlock >= terms.snapshotBlock ||
     terms.bettingCutoff <= terms.startBlock ||
     terms.bettingCutoff > terms.snapshotBlock ||
-    terms.quietBlocks === 0 ||
-    terms.historyWindow === 0
+    terms.quietBlocks === 0n ||
+    terms.historyWindow === 0n
   ) {
     fail("CHUNK_TERMS_TIMING");
   }
@@ -347,10 +360,10 @@ function readUintWord(r: WordReader, width: number): bigint {
   return BigInt(bytesToHex(w));
 }
 
-function readU64Word(r: WordReader): number {
-  const value = readUintWord(r, 8);
-  if (value > BigInt(Number.MAX_SAFE_INTEGER)) fail("CHUNK_U64_INVALID");
-  return Number(value);
+function readU64Word(r: WordReader): bigint {
+  // The core decoder rejects any nonzero top 24 bytes; the value keeps
+  // full uint64 width as a bigint (no Number precision loss).
+  return readUintWord(r, 8);
 }
 
 function readI24Word(r: WordReader): number {
@@ -375,7 +388,9 @@ export function decodeTermsAbi(bytes: Hex): VolumeTermsV1 {
   const domain = readWordHex(r);
   const rulesHash = readWordHex(r);
   const proofMethodId = readWordHex(r);
-  const chainId = readU64Word(r);
+  const chainIdWord = readU64Word(r);
+  if (chainIdWord > BigInt(Number.MAX_SAFE_INTEGER)) fail("CHUNK_U64_INVALID");
+  const chainId = Number(chainIdWord);
   const controller = readAddressWord(r);
   const adapter = readAddressWord(r);
   const pool = readAddressWord(r);
@@ -483,13 +498,13 @@ export function encodeTermsAbi(terms: VolumeTermsV1): Hex {
     lowerHex(terms.domain),
     lowerHex(terms.rulesHash),
     lowerHex(terms.proofMethodId),
-    word(BigInt(terms.chainId)),
+    u64Word(BigInt(terms.chainId)),
     addressWord(terms.controller),
     addressWord(terms.adapter),
     addressWord(terms.pool),
     word(terms.raceId),
-    word(BigInt(terms.headerFormat)),
-    word(BigInt(terms.entrantCount)),
+    u8Word(terms.headerFormat),
+    u8Word(terms.entrantCount),
   ];
   for (const address of terms.entrants) words.push(addressWord(address));
   words.push(lowerHex(terms.entrantsHash));
@@ -503,18 +518,18 @@ export function encodeTermsAbi(terms: VolumeTermsV1): Hex {
     terms.submissionDeadline,
     terms.terminalExpiry,
   ]) {
-    words.push(word(BigInt(n)));
+    words.push(u64Word(n));
   }
   words.push(
     addressWord(terms.history),
     lowerHex(terms.historyCodeHash),
-    word(BigInt(terms.historyWindow)),
+    u64Word(terms.historyWindow),
     addressWord(terms.wrappedNative),
     lowerHex(terms.wrappedNativeCodeHash),
     addressWord(terms.quoteAsset),
-    word(BigInt(terms.quoteDecimals)),
+    u8Word(terms.quoteDecimals),
     addressWord(terms.collateral),
-    word(BigInt(terms.collateralDecimals)),
+    u8Word(terms.collateralDecimals),
     lowerHex(terms.economicPolicyHash),
     lowerHex(terms.proofSuiteHash),
     addressWord(terms.sp1Verifier),
@@ -551,7 +566,10 @@ export function validateChunkRange(context: ChunkContext): void {
   ) {
     fail("CHUNK_RANGE_INVALID");
   }
-  if (context.fromExclusive < t.startBlock || context.toInclusive > t.snapshotBlock) {
+  if (
+    BigInt(context.fromExclusive) < t.startBlock ||
+    BigInt(context.toInclusive) > t.snapshotBlock
+  ) {
     fail("CHUNK_RANGE_INVALID");
   }
   if (!isHash32(context.beforeHash) || !isHash32(context.endHash)) fail("CHUNK_RANGE_INVALID");
@@ -763,7 +781,11 @@ export async function captureChunkFrames(args: {
     if (Number(BigInt(block.number)) !== height) fail("CHUNK_BLOCK_GAP");
     if (lowerHex(block.parentHash) !== lowerHex(parent)) fail("CHUNK_PARENT_MISMATCH");
     const raw = await rpc.request<unknown[]>("eth_getBlockReceipts", [number]);
-    if (!Array.isArray(raw) || raw.length > 100_000) fail("CHUNK_RECEIPT_LIMIT");
+    if (!Array.isArray(raw)) fail("CHUNK_RECEIPTS_INVALID");
+    // The guest has no application receipt cap (CHUNK-INTERFACE.md, "Memory
+    // and proof boundaries"). The bound is the guest's uint64 count/length
+    // representation limit; the framing encoder fails closed on u64
+    // overflow, and the receipts root check authenticates the full set.
     const receipts = raw
       .map(parseRpcBlockReceipt)
       .sort((a, b) => a.transactionIndex - b.transactionIndex);

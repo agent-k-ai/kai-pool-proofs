@@ -712,7 +712,7 @@ describe("captureChunk", () => {
 
   function shiftedTerms(): VolumeTermsV1 {
     const terms = decodeTermsAbi(TERMS);
-    const shift = BLOCK - 1 - terms.startBlock;
+    const shift = BigInt(BLOCK - 1) - terms.startBlock;
     terms.startBlock += shift;
     terms.snapshotBlock += shift;
     terms.bettingCutoff += shift;
