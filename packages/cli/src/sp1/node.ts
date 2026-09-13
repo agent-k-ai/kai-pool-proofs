@@ -13,14 +13,20 @@ export class VolumeNode {
     readonly host: HostRunner;
     constructor(readonly config: NodeConfig, readonly store: Store, readonly chain: Chain, host?: HostRunner) { this.host = host ?? new CpuHost(config); }
     async guard(): Promise<Context> { await this.store.assertValid(); const c = await this.store.context(); equal(c.approvedIdentity, approvalIdentity(this.config), 'APPROVAL_CHANGED'); await this.chain.canonical(c, this.store); return c; }
+    /** Pure schedule computation. No store access: reads must not write. */
+    computeJobs(c: Context): Job[] {
+        const t = sp1Terms(c.terms);
+        return schedule(t.startBlock, t.snapshotBlock, this.config.resources.chunkBlocks);
+    }
+    /** Compute the schedule and commit it. Call only while holding store.lock(). */
     async jobs(c: Context): Promise<Job[]> {
-        const t = sp1Terms(c.terms), jobs = schedule(t.startBlock, t.snapshotBlock, this.config.resources.chunkBlocks);
+        const jobs = this.computeJobs(c);
         await this.store.commit('schedule', { chunkBlocks: String(this.config.resources.chunkBlocks) }, { 'jobs.json': Buffer.from(stable(jobs)) }, { kind: 'schedule-only' });
         return jobs;
     }
     async status(): Promise<unknown> {
         await this.store.assertValid();
-        const c = await this.store.context(), jobs = await this.jobs(c);
+        const c = await this.store.context(), jobs = this.computeJobs(c);
         const missing = [], stages = [];
         for (const j of jobs) {
             const proof = await this.store.read(`verified-${j.key}`);
@@ -195,7 +201,7 @@ export class VolumeNode {
         });
     }
     async verifyFinal(): Promise<Stage> {
-        const c = await this.guard(), jobs = await this.jobs(c), root = jobs[jobs.length - 1];
+        const c = await this.guard(), jobs = this.computeJobs(c), root = jobs[jobs.length - 1];
         await this.checkCaptures(c, jobs);
         const s = await this.store.read(`verified-${root.key}`);
         check(s && s.facts.form === 'groth16', 'FINAL_PROOF_MISSING');

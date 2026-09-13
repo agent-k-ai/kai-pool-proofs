@@ -55,7 +55,7 @@ export async function run(argv: string[]): Promise<unknown> {
     if (command === 'init') {
         const c = await chain.context(race(), address(need('beneficiary')), safe(Number(need('mask')), 1));
         await store.initialize(c);
-        return store.lock(() => node.status());
+        return store.lock(async () => { await node.jobs(c); return node.status(); });
     }
     if (command === 'unlock') {
         await store.unlock();
