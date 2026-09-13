@@ -194,10 +194,12 @@ fn malformed_new_type_envelopes_still_rejected() {
 }
 
 /// Types we did NOT add must remain rejected. Guards against wildcard acceptance.
+/// 0x78 is explicitly rejected here: upstream EncodeIndex writes
+/// ArbitrumLegacyTxType unprefixed, so it must never parse as a typed envelope.
 #[test]
 fn unsupported_type_bytes_still_rejected() {
     let base: &[u8] = &VECTORS[0].encoded;
-    for bad in [0x00u8, 0x03, 0x05, 0x63, 0x65, 0x66, 0x67, 0x6b, 0x7f] {
+    for bad in [0x00u8, 0x05, 0x63, 0x67, 0x6b, 0x78, 0x7f] {
         let mut v = base.to_vec();
         v[0] = bad;
         assert!(
@@ -208,9 +210,30 @@ fn unsupported_type_bytes_still_rejected() {
     }
 }
 
+/// Synthetic source-conformance vectors for the unobserved typed bytes 0x03, 0x65,
+/// 0x66. These are NOT chain data: each is the canonical four-field body of the real
+/// zero-log 0x6a vector (V0) re-prefixed with the unobserved type byte, per the
+/// EncodeIndex shape. They pin parser acceptance of the full typed set independent
+/// of corpus coverage.
+#[test]
+fn synthetic_vectors_cover_unobserved_typed_bytes() {
+    let body = &VECTORS[0].encoded[1..];
+    for t in [0x03u8, 0x65, 0x66] {
+        let mut v = vec![t];
+        v.extend_from_slice(body);
+        let stats = visit_logs(&v, |_, _| Ok(())).unwrap_or_else(|e| {
+            panic!("synthetic typed byte {:#04x} must parse, got {:?}", t, e)
+        });
+        assert_eq!(stats.envelope_type, Some(t), "synthetic byte {:#04x} must report its own envelope type", t);
+        assert_eq!(stats.success, true);
+        assert_eq!(stats.cumulative_gas_used, 0);
+        assert_eq!(stats.log_count, 0);
+    }
+}
+
 /// Full acceptance-set sweep over 0x00..=0xff. Pins the exact three-way classification:
 /// - 0xc0..=0xff  -> accepted as LEGACY (envelope_type None), payload is the whole slice
-/// - the seven typed bytes -> accepted as TYPED (envelope_type Some(byte))
+/// - the ten typed bytes -> accepted as TYPED (envelope_type Some(byte))
 /// - every other byte -> rejected
 /// A future widening, or an accidental wildcard, fails this test.
 #[test]
@@ -219,8 +242,8 @@ fn full_byte_sweep_pins_exact_acceptance_set() {
     let body: Vec<u8> = VECTORS[0].encoded[1..].to_vec();
     // Accepted typed-envelope set. When this set changes, update ACCEPTED and TYPED
     // together. Every other count derives from them, so the sweep cannot go stale.
-    const ACCEPTED: [u8; 7] = [0x01, 0x02, 0x04, 0x64, 0x68, 0x69, 0x6a];
-    const TYPED: usize = 7;
+    const ACCEPTED: [u8; 10] = [0x01, 0x02, 0x03, 0x04, 0x64, 0x65, 0x66, 0x68, 0x69, 0x6a];
+    const TYPED: usize = 10;
     const LEGACY: usize = 64; // 0xc0..=0xff
 
     let mut n_legacy = 0usize;

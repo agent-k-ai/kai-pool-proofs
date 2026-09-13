@@ -502,13 +502,15 @@ describe("guest receipt compatibility", () => {
   });
 
   it("accepts the adapter's envelopes", () => {
-    for (const type of [0, 1, 2, 0x6a]) {
+    for (const type of [0, 1, 2, 3, 4, 0x64, 0x65, 0x66, 0x68, 0x69, 0x6a]) {
       expect(validateGuestReceiptCompat(base(type))).toBeUndefined();
     }
   });
 
   it("refuses unsupported typed envelopes", () => {
-    for (const type of [0x03, 0x7f]) {
+    // 0x78 must be refused: upstream EncodeIndex writes ArbitrumLegacyTxType
+    // unprefixed, so it is never a valid typed envelope byte.
+    for (const type of [0x05, 0x63, 0x67, 0x6b, 0x78, 0x7f]) {
       expect(() => validateGuestReceiptCompat(base(type))).toThrow("CHUNK_RECEIPT_TYPE");
     }
   });

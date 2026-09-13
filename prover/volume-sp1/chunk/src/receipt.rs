@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Alpha Tech Organization
 //! Minimal integration adapter, not a delivered Qwen parser. See SOURCE-ORIGINS.json.
-//! Supports post-Byzantium legacy, EIP-2930/1559, and observed Nitro typed receipts
-//! 0x04, 0x64, 0x68, 0x69, 0x6a. Each observed type carries the identical standard
-//! four-field body [status, cumulativeGasUsed, logsBloom, logs]; only the leading
-//! envelope type byte differs. Verified against real chain 46630 whole-block vectors
-//! (blocks 118183060, 118186604, 118189847), whose computed receiptsRoot matches the
-//! frozen header root. Acceptance rests on observed shape equality on chain 46630, not on
-//! a published Nitro receipt-type specification.
+//! Supports post-Byzantium legacy (unprefixed RLP list; upstream EncodeIndex also
+//! writes ArbitrumLegacyTxType 0x78 unprefixed, so 0x78 has no typed arm here) and
+//! the typed receipt envelopes 0x01, 0x02, 0x03, 0x04, 0x64, 0x65, 0x66, 0x68,
+//! 0x69, 0x6a. Every typed envelope carries the identical standard four-field body
+//! [status, cumulativeGasUsed, logsBloom, logs]; only the leading type byte differs.
+//! The typed set mirrors the explicit cases of Receipts.EncodeIndex in the pinned
+//! Nitro go-ethereum submodule 0f618f330b8d (master source pin, not evidence of the
+//! deployed runtime revision). 0x03/0x65/0x66 are unobserved in the corpus and are
+//! covered by synthetic source-conformance vectors. Verified against real chain 46630
+//! whole-block vectors (blocks 118183060, 118186604, 118189847), whose computed
+//! receiptsRoot matches the frozen header root. Unknown type bytes fail closed.
 use crate::{Error, Result};
 use kai_volume_core::DecodedLog;
 use kai_volume_primitives::rlp::{self, Items};
@@ -36,7 +40,7 @@ where
         .ok_or(Error::Receipt("empty receipt value"))?;
     let (envelope_type, payload) = match first {
         0xc0..=0xff => (None, encoded),
-        0x01 | 0x02 | 0x04 | 0x64 | 0x68 | 0x69 | 0x6a => (Some(first), &encoded[1..]),
+        0x01 | 0x02 | 0x03 | 0x04 | 0x64 | 0x65 | 0x66 | 0x68 | 0x69 | 0x6a => (Some(first), &encoded[1..]),
         _ => return Err(Error::Receipt("unsupported receipt envelope")),
     };
     let mut fields = Items::new(payload).map_err(rlp_error)?;
