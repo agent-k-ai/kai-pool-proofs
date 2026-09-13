@@ -1,6 +1,6 @@
 # Public SP1 node interface — integration contract
 
-Release: 0.1.0-node.20260912f. Local integration only; no publication or deployment.
+Release: 0.1.0-node.20260912g. Local integration only; no publication or deployment.
 
 The new `volume-sp1-node` executable is separate from the receipt-diagnostic CLI.
 Its flow is inspect -> init -> capture/resume -> frames -> prove/resume -> verify ->
@@ -68,7 +68,7 @@ The integration imports exact range commit 9a12b81f3587ccc4e903593fbd52c5ebeb734
 and exact public support e3fc6445c54b21c49815ea73660af53faa7e5530 as merge parents;
 the initial merge is conflict-free. Preserve their author commits. Range RR-1 is
 closed by synchronizing the prover marker to its unchanged workspace release e.
-The node gets its own release f; no guest package version, guest source, ELF, VK,
-old proof context or original diagnostic evidence is relabelled. The host package gets node release f while the guest workspace stays e. Host-only
+The node gets release g; no guest package version, guest source, ELF, VK,
+old proof context or original diagnostic evidence is relabelled. The host package retains validated release f while the guest workspace stays e. Host-only
 changes receive independent compilation/verification. The retained two-block proof remains
 diagnostic. Full-window feasibility and deployed financial acceptance remain gates.

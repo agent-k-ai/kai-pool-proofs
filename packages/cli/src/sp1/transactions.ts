@@ -130,7 +130,7 @@ export class Transactions {
         const block = await rpc.request<{
             baseFeePerGas?: Hex;
         }>('eth_getBlockByNumber', ['latest', false]);
-        check(block.baseFeePerGas !== undefined && BigInt(e.maxFeePerGas) >= BigInt(block.baseFeePerGas) + BigInt(e.maxPriorityFeePerGas), 'BASE_FEE_EXCEEDS_CAP');
+        check(block.baseFeePerGas !== undefined && BigInt(e.maxFeePerGas) >= BigInt(block.baseFeePerGas), 'BASE_FEE_EXCEEDS_CAP');
         const tx = rpcEnvelope(e);
         await rpc.request('eth_call', [tx, 'latest']);
         check(BigInt(await rpc.request<string>('eth_estimateGas', [tx])) <= BigInt(e.gas), 'GAS_LIMIT');

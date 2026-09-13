@@ -1,6 +1,6 @@
 # Own-RPC / own-wallet SP1 VOLUME node
 
-Release **0.1.0-node.20260912f**. This source integrates the real chunk/range CPU
+Release **0.1.0-node.20260912g**. This source integrates the real chunk/range CPU
 producers and protocol-7 production interfaces. Its financial path accepts only
 a full supported race interval, never receipt diagnostics or the saved two-block
 proof. No deployment, approved live configuration, full-window throughput or

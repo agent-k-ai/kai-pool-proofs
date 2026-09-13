@@ -9,7 +9,7 @@ and prepare/broadcast/confirm protocol-7 submissions, closure and earned claims.
 See **[the public SP1 node setup and commands](docs/public-sp1-node.md)** and
 [the integration interface](PUBLIC-SP1-NODE-INTERFACE.md).
 
-Release **0.1.0-node.20260912f** imports the reviewed range producer and generated
+Release **0.1.0-node.20260912g** imports the reviewed range producer and generated
 production adapter/controller/pool ABI. Full-window proving feasibility and live
 financial acceptance remain unverified. The pinned-toolchain distribution locator,
 Qwen's capture corrections and the final contract AC-1 identity refresh remain

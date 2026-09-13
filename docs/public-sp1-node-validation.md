@@ -1,6 +1,6 @@
-# Node validation — 0.1.0-node.20260912f
+# Node validation — 0.1.0-node.20260912g
 
-34 focused private tests pass. They cover generated ABI/metadata correspondence,
+35 focused private tests pass. They cover generated ABI/metadata correspondence,
 4352-byte terms, 800-byte journals/356-byte EVM encoding, exact uint64 values,
 context/manifest resume, content corruption, failure atomicity, reorg invalidation,
 explicit candidate retry, real cgroup limits, role/adjacency/sum rules, linked
@@ -31,8 +31,9 @@ unary range wrapping and reassembled the multilevel input byte for byte.
 The range guest was rebuilt after the host-only lock/version change and is
 byte-identical: `1d9d837677c3f363f3b7a0ee9f7117a3d1cdbc23d0c18df61727fe6872a8aadd`.
 All 68 reviewed guest/core/range/build files and workspace package metadata retain
-their original bytes. The VERSION marker now agrees with guest workspace e; only
-the host package and node packages carry new release f. Original chunk source c,
+their original bytes. The VERSION marker now agrees with guest workspace e. The validated host remains
+release f; node/CLI release g changes only the EIP-1559 tip-cap preflight after the
+initial integration commit. Original chunk source c,
 ELF, program keys and proof statement are not relabelled.
 
 The final saved bundle remains

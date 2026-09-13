@@ -1,5 +1,11 @@
 # Releases
 
+## 0.1.0-node.20260912g
+
+- Correct EIP-1559 preflight to permit clipping the priority fee by the max-fee
+  cap. Require maxFeePerGas to cover the base fee; the priority cap is checked
+  independently. Preserve the validated f host and original guest identities.
+
 ## 0.1.0-node.20260912f
 
 - Import exact public support e3fc644 and reviewed range 9a12b81 histories.
