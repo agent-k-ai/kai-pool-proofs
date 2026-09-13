@@ -1,15 +1,18 @@
 # kai-pool-proofs
 
-Open-source, independently runnable **VOLUME** proof-submission code for
+Open-source, independently runnable **VOLUME** supporting tooling for
 prediction pools on Robinhood testnet `46630`.
 
-An outsider who is not the race creator fetches public canonical and
-verified witnesses, uses their own RPC and funded signer, constructs
-receipt proofs, broadcasts `submitSwaps`, confirms the receipt, and
-reconciles accepted quote deltas and wide credits for all four entrants.
-This is the receipt-stage capture and diagnostics path; the settled spec
-makes the final paid volume node a succinct SP1 proof, and this repository
-is its supporting tooling, not the final prover.
+The settled spec makes the final paid volume node a succinct SP1 proof
+(receipts read through the receipt trie to proven exhaustion). This
+repository is its supporting capture, export, verification, and
+diagnostics tooling, not the final prover. It exports the version-1
+chunk frame sequence the SP1 VOLUME complete-block guest consumes,
+verifies headers and receipts roots from the user's own RPC, and retains
+the earlier receipt-stage wire schema and `submitSwaps` CLI as historical
+supporting tooling. That older path is not the final SP1 design: its
+receipt-stage `termsHash` and `submitSwaps` submission are not the paid
+volume node.
 
 This repository is the public proof-code destination. The parent
 application remains a private repository; the public build never requires
@@ -24,13 +27,19 @@ License: Apache-2.0. See `LICENSE`, `NOTICE`, and
 C1 checkpoint (task 11300): the pure library (header/receipt verification,
 venue qualification, receipt capture, Swap batch building) and the CLI are
 implemented with portable tests. The wire schema (Astra-owned) is committed
-at digest `3d97d8d`. D1 (staging/closure) and D2 (pool-funded rewards) are
-user decisions that stay explicit and unresolved in the schema
-(`policy.decisionStatus = "pending"`, unknown values null). No
-creator-prefunding is implemented and no completeness is claimed: a C1 run
-proves selected authentic receipt inclusion and credit accounting, not
-exhaustive volume. No live signing yet: submit/confirm/claim are implemented
-against an injected signer and wait on the review gate.
+at digest `3d97d8d` and is retained as historical supporting tooling for
+the receipt-stage path.
+
+Reward policy (D2): the user selected the pool-funded reserve/refund
+policy on 2026-09-13. Proof fees are reserved from pool contributions;
+the remaining stake plus the unused reserve is refunded; earned valid
+proof rewards remain payable. Numeric percentage, minimums, and settler
+allocation are unspecified. Receipt-only paid staging (D1) is not an
+approved milestone. No creator-prefunding is implemented and no
+completeness is claimed: a C1 run proves selected authentic receipt
+inclusion and credit accounting, not exhaustive volume. No live signing
+yet: submit/confirm/claim are implemented against an injected signer and
+wait on the review gate.
 
 Role under the settled spec: this repository is **supporting
 capture/validation/diagnostics** for the VOLUME race. The final paid volume

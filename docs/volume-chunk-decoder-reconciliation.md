@@ -11,9 +11,13 @@ path in `packages/volume-proof/src/chunk-frame.ts`.
 
 The two Rust decoders agree on structure and diverge on three
 acceptance rules. The chunk adapter is stricter. The capture path
-enforces the adapter's strict rules, so it never emits a frame the
-guest refuses. The general-purpose decoders keep their broader
-acceptance; the difference is documented here instead of being hidden.
+enforces the adapter's strict rules on decoded receipts, so within the
+verified scope (envelope type, status, gas, canonical re-encoding,
+receipts-root match) it does not emit a frame the guest refuses.
+Malformed context or receipt compatibility beyond the rules listed
+here is not proven by this document and needs independent review. The
+general-purpose decoders keep their broader acceptance; the difference
+is documented here instead of being hidden.
 
 ## Field-by-field comparison
 
@@ -31,7 +35,7 @@ acceptance; the difference is documented here instead of being hidden.
 
 1. Typed envelope. `receipt-decoded` accepts every leading byte
    `0x00..=0x7f` as a typed envelope. The adapter accepts only
-   `0x01` (EIP-1559), `0x02` (EIP-2930), and the observed Nitro
+   `0x01` (EIP-2930), `0x02` (EIP-1559), and the observed Nitro
    `0x6a`; anything else is `unsupported receipt envelope`.
 2. Status encoding. `receipt-decoded` decodes the status as a quantity
    and accepts any RLP encoding of the values 0 or 1. The adapter
@@ -70,7 +74,7 @@ decide what the guest will accept.
   guest would reject at runtime.
 - A noncanonical raw status or gas encoding re-encodes differently and
   fails capture with `CHUNK_RECEIPTS_ROOT_MISMATCH`.
-- The golden fixture block 117903561 (receipt types `0x01` and `0x02`,
+- The golden fixture block 117903561 (receipt types `0x6a` and `0x02`,
   canonical fields) passes the check, and the exported frames remain
   byte-for-byte identical to the guest-executed golden file.
 

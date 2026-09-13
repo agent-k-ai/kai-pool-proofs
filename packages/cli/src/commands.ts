@@ -15,7 +15,7 @@
  *
  * Apache-2.0. Copyright 2026 Alpha Tech Organization.
  */
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import {
   decodeEventLog,
   encodeFunctionData,
@@ -662,7 +662,19 @@ export async function captureChunk(ctx: CommandContext, args: CaptureChunkArgs):
   const file = encodeFrameFile(captured.frames);
   const tmp = `${args.outPath}.tmp-${process.pid}`;
   writeFileSync(tmp, file);
-  renameSync(tmp, args.outPath);
+  try {
+    renameSync(tmp, args.outPath);
+  } catch (err) {
+    // Rename failed: remove the temporary file and preserve any existing
+    // destination. The rename is the only step that touches the
+    // destination, so it is untouched here.
+    try {
+      unlinkSync(tmp);
+    } catch {
+      // Best effort; the tmp name is pid-scoped. Report the rename error.
+    }
+    throw err;
+  }
   return {
     mode: "capture-chunk",
     note: "capture/export only; frames are guest input, not a proof; nothing was signed or broadcast",
