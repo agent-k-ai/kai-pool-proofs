@@ -215,6 +215,16 @@ Capture verification, all from the user's own RPC:
 - Every reconstructed receipts root equals the header `receiptsRoot`.
 - Terms decode to exactly 4,352 bytes and pass structural validation
   (chain, timing, entrant/venue invariants, padding, pool key hashes).
+- Terms ABI widths mirror the core decoder exactly: `uint64` words carry
+  the value in the low 8 bytes with the top 24 bytes zero, `uint8` words
+  in the low byte, `uint24` in the low 3 bytes. The public encoder
+  refuses out-of-width values before writing a byte, and `uint64` terms
+  fields are `bigint` so the full 64-bit range round-trips without
+  `Number` precision loss.
+- There is no application receipt cap. The bound is the guest's `uint64`
+  count/length representation limit (CHUNK-INTERFACE.md, "Memory and
+  proof boundaries"); the framing encoder fails closed on `u64`
+  overflow and the receipts-root check authenticates the full set.
 
 The terms file is 4,352 raw bytes or 8,706 hex characters. The output
 file is written atomically (tmp + rename) only after every check passes.
