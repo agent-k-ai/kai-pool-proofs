@@ -217,7 +217,11 @@ fn unsupported_type_bytes_still_rejected() {
 fn full_byte_sweep_pins_exact_acceptance_set() {
     // Valid four-field payload, taken from a real typed receipt minus its type byte.
     let body: Vec<u8> = VECTORS[0].encoded[1..].to_vec();
-    let accepted: [u8; 7] = [0x01, 0x02, 0x04, 0x64, 0x68, 0x69, 0x6a];
+    // Accepted typed-envelope set. When this set changes, update ACCEPTED and TYPED
+    // together. Every other count derives from them, so the sweep cannot go stale.
+    const ACCEPTED: [u8; 7] = [0x01, 0x02, 0x04, 0x64, 0x68, 0x69, 0x6a];
+    const TYPED: usize = 7;
+    const LEGACY: usize = 64; // 0xc0..=0xff
 
     let mut n_legacy = 0usize;
     let mut n_typed = 0usize;
@@ -242,7 +246,7 @@ fn full_byte_sweep_pins_exact_acceptance_set() {
             let st = result.unwrap_or_else(|e| panic!("legacy byte {:#04x} must parse, got {:?}", b, e));
             assert_eq!(st.envelope_type, None, "legacy byte {:#04x} must report no envelope type", b);
             n_legacy += 1;
-        } else if accepted.contains(&b) {
+        } else if ACCEPTED.contains(&b) {
             let st = result.unwrap_or_else(|e| panic!("typed byte {:#04x} must parse, got {:?}", b, e));
             assert_eq!(st.envelope_type, Some(b), "typed byte {:#04x} must report its own envelope type", b);
             n_typed += 1;
@@ -256,7 +260,14 @@ fn full_byte_sweep_pins_exact_acceptance_set() {
         }
     }
 
-    assert_eq!(n_typed, 7, "exactly seven typed bytes must be accepted");
-    assert_eq!(n_legacy, 64, "0xc0..=0xff is 64 legacy bytes");
-    assert_eq!(n_rejected, 256 - 64 - 7, "all remaining bytes must be rejected");
+    // The array and the declared size must agree, or the sweep proves the wrong set.
+    assert_eq!(ACCEPTED.len(), TYPED, "ACCEPTED length must equal TYPED");
+    assert_eq!(n_typed, TYPED, "exactly TYPED typed bytes must be accepted");
+    assert_eq!(n_legacy, LEGACY, "0xc0..=0xff is LEGACY legacy bytes");
+    assert_eq!(n_rejected, 256 - TYPED - LEGACY, "all remaining bytes must be rejected");
+    assert_eq!(
+        n_typed + n_legacy + n_rejected,
+        256,
+        "the three classifications must partition all 256 byte values"
+    );
 }
