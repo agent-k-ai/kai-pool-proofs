@@ -87,7 +87,7 @@ No source/manifest identity is inserted into its own guest build.
 | Range ELF, 362,888 bytes, SHA-256 | `1d9d837677c3f363f3b7a0ee9f7117a3d1cdbc23d0c18df61727fe6872a8aadd` |
 | Chunk SDK program VK bytes32 | `0x00ecdd90c9c3484788533648d020fb122f3ee13168f5b621e59a677f59ce7e1c` |
 | Range SDK program VK bytes32 | `0x00f9a794e2d64a86dca48bb66e37b7ee87294a7fac27fdecbbd5bd0f41f6c00a` |
-| Chunk serialized VK SHA-256 | `7fee6711feceed7d536ae1d48f28feeadd768961c131dfbaafb9da8d34db514d` |
+| Chunk serialized VK SHA-256 | `5449444db6a4acad980f122929b4f6265cc8ef07ae737745c24d5299dcc2b5a1` |
 | Range serialized VK SHA-256 | `16f5ec78bbaaa8ba211dc5a0ada672df3b78ee7c354d91cb257b694f413f3a48` |
 | Suite preimage, 192 bytes, SHA-256 | `37911952e34e41e922579e1f4fa3d6c2fd70916322cbc67dbc2a85399b028067` |
 | Suite Ethereum Keccak-256 | `83420be21ff897bdd3452c928ab57f1588ed5d743daaf62564be5ec10583d4ec` |
