@@ -36,8 +36,8 @@ export async function loadConfig(file: string): Promise<NodeConfig> {
     for (const commit of [c.deployment.contractSourceCommit, c.build.sourceCommit, c.build.chunkSourceCommit, c.build.rangeSourceCommit])
         check(/^[0-9a-f]{40}$/.test(commit), 'SOURCE_COMMIT');
     check(c.deployment.contractSourceCommit === 'b84fdd3f119aa2ade748b4cf0e616f5b7c1f4e94', 'PRODUCTION_SOURCE_REVISION');
-    check(c.build.chunkSourceCommit === '3cbabe7907c6b2ba3c498a54e2c977cbab2e17c1' && c.build.rangeSourceCommit === '9a12b81f3587ccc4e903593fbd52c5ebeb7349eb', 'GUEST_SOURCE_REVISION');
-    check(c.build.chunkElf.sha256 === 'd81a33578657f97389f32809739bd8b2a98246372d98ff30581515167762679c' && c.build.rangeElf.sha256 === '1d9d837677c3f363f3b7a0ee9f7117a3d1cdbc23d0c18df61727fe6872a8aadd', 'REVIEWED_ELFS');
+    check(c.build.chunkSourceCommit === '00aba6b1646879fe6c6f485bb530437caeb22988' && c.build.rangeSourceCommit === '9a12b81f3587ccc4e903593fbd52c5ebeb7349eb', 'GUEST_SOURCE_REVISION');
+    check(c.build.chunkElf.sha256 === '6e74010b78aee1d7de9abf760cc7fe620d0539f25d6a4fe61120e3d23fa4e855' && c.build.rangeElf.sha256 === '1d9d837677c3f363f3b7a0ee9f7117a3d1cdbc23d0c18df61727fe6872a8aadd', 'REVIEWED_ELFS');
     for (const pin of [...Object.values(c.deployment.abi), c.build.chunkElf, c.build.rangeElf, c.build.compressedHost, c.build.groth16Host, c.build.runner, c.build.sourceManifest, c.build.parameterManifest]) {
         check(typeof pin.path === 'string' && /^[0-9a-f]{64}$/.test(pin.sha256), 'FILE_PIN');
         pin.path = resolve(dirname(file), pin.path);
