@@ -266,12 +266,26 @@ fn malformed_relevant_v3_logs_error_and_irrelevant_logs_do_not_contribute() {
     assert!(qualify(checked, view(other, &topics, &data))
         .unwrap()
         .is_none());
-    // wrong emitter: the V4 manager with a V3 topic is not a V3 venue, on either entry point
+    // wrong emitter: the V4 manager with a V3 topic is not a V3 venue, on either entry point.
+    // Both deltas are far above every venue floor, so only the kind filter can exclude it.
     let manager = t.venues[1].account;
-    assert!(qualify_v3(checked, view(manager, &topics, &data))
+    let mut wide = data.clone();
+    wide[..32].copy_from_slice(&I256::from(-1_000i128).to_be_bytes());
+    wide[32..64].copy_from_slice(&I256::from(1_000i128).to_be_bytes());
+    assert_eq!(
+        qualify_v3(checked, view(emitter, &topics, &wide))
+            .unwrap()
+            .unwrap()
+            .quote_amount,
+        U256::from(1_000u64)
+    );
+    assert!(t.venues[1..4]
+        .iter()
+        .all(|v| v.min_notional <= U256::from(1_000u64)));
+    assert!(qualify_v3(checked, view(manager, &topics, &wide))
         .unwrap()
         .is_none());
-    assert!(qualify(checked, view(manager, &topics, &data))
+    assert!(qualify(checked, view(manager, &topics, &wide))
         .unwrap()
         .is_none());
     // wrong topic0 on the pool: not a Swap
