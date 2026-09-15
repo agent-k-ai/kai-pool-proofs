@@ -60,5 +60,6 @@ There are no swap/receipt limits or reward calculations. An accumulator contains
 ## Integration boundary
 
 Core has no dependency on trie/receipt crates, so they may depend on its types or copy bytes into them without a cycle.
+Both guests link this crate: the chunk guest through `kai-volume-chunk` and the range guest through `kai-volume-range` (`range/src/framing.rs` decodes and validates the terms of every request). A change to terms validation therefore changes both ELFs and both program keys; a chunk-only re-freeze leaves the range leg refusing terms the chunk leg accepts.
 The guest/aggregation owner must authenticate statements and enforce all receipt/range coverage. No host or core validation flag substitutes for that work.
 Funding contracts, prior C1 CLI/schema defects and GPU/proving backend are outside this package.
