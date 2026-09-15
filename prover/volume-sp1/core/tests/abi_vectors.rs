@@ -99,11 +99,15 @@ fn terms_reject_bad_arity_padding_duplicates_kinds_keys_quotes_and_timing() {
     let mut t = base.clone();
     t.venues[1] = t.venues[0];
     assert!(t.validate().is_err());
-    for kind in [0, 2, 3, 255] {
+    for kind in [0, 3, 255] {
         let mut t = base.clone();
         t.venues[0].kind = kind;
         assert_eq!(t.validate(), Err(Error::UnsupportedVenue(kind)));
     }
+    // kind 2 exists, but a V4-shaped venue relabelled as a V3 pool fails its pool-id rule
+    let mut t = base.clone();
+    t.venues[0].kind = 2;
+    assert_eq!(t.validate(), Err(Error::Invalid("pool id")));
     let mut t = base.clone();
     t.venues[0].pool_id[0] ^= 1;
     assert!(t.validate().is_err());

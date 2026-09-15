@@ -76,6 +76,37 @@ const attribution=[3,4,8].map(n=>{
   data:encodeAbiParameters(swapTypes,[-v.minNotional,7n,11n,13n,0,v.fee]),entrantIndex:i}));
  return {terms:jsonTerms(t),logs,expectedVolumes:t.venues.map((v,i)=>word(i<n?v.minNotional:0n))};
 });
+// Kind-2 (Uniswap V3) venues: the pool itself is the account, poolId is bytes32(uint160(pool)),
+// no hook (zero hook and zero hook code hash), tickSpacing 0. Two sides: the entrant token as
+// currency0 (quote address above it) and as currency1 (quote address below it).
+const V3_TOPIC=hash('Swap(address,address,int256,int256,uint160,uint128,int24)');
+const addrWord=(a)=>padHex(a,{size:32});
+function v3Terms(side) {
+ const t=terms(4,true);
+ if(side==='token1'){const wrapper=addr(0x0900);t.wrappedNative=wrapper;t.quoteAsset=wrapper;for(const v of t.venues.slice(0,4))v.quoteAsset=wrapper;}
+ const pool=addr(0xe500),token=t.entrants[0],quote=t.wrappedNative;
+ const [c0,c1]=side==='token1'?[quote,token]:[token,quote];
+ if(!(c0<c1))throw new Error('V3 venue currency order');
+ t.venues[0]={kind:2,account:pool,accountCodeHash:hash('v3-pool-code'),currency0:c0,currency1:c1,fee:3000,tickSpacing:0,hooks:zaddr,hookCodeHash:zhash,poolId:addrWord(pool),quoteAsset:quote,minNotional:100n};
+ return t;
+}
+const v3SwapTypes=fields([['amount0','int256'],['amount1','int256'],['sqrtPriceX96','uint160'],['liquidity','uint128'],['tick','int24']]);
+const signedWord=(n)=>toHex(BigInt.asUintN(256,n),{size:32});
+function v3SwapCase(name,t,a0,a1,expectedQuote,output,accepted=true) {
+ const data=encodeAbiParameters(v3SwapTypes,[a0,a1,(1n<<159n)+5n,(1n<<127n)+6n,-8388608]);
+ const decoded=decodeAbiParameters(v3SwapTypes,data);
+ if(decoded[0]!==a0 || decoded[1]!==a1)throw new Error('viem signed int256 mismatch');
+ if(size(data)!==160)throw new Error('V3 Swap data width');
+ const encoded=termsAbi(t);
+ return {name,terms:jsonTerms(t),termsAbi:encoded,termsHash:keccak256(encoded),log:{emitter:t.venues[0].account,topics:[V3_TOPIC,word(0x8001),word(0x8002)],data},
+  expected:{accepted,quoteAmount:word(expectedQuote),tokenIsOutput:output,amount0:a0.toString(),amount1:a1.toString(),amount0Word:signedWord(a0),amount1Word:signedWord(a1),sender:addr(0x8001)}};
+}
+const v3t0=v3Terms('token0'),v3t1=v3Terms('token1'),I256_MIN=-(1n<<255n),I256_MAX=(1n<<255n)-1n;
+const v3Swaps=[
+ v3SwapCase('v3-token0-buy-at-floor',v3t0,-5n,100n,100n,true),v3SwapCase('v3-token0-sell',v3t0,5n,-101n,101n,false),
+ v3SwapCase('v3-token0-below-floor',v3t0,-5n,99n,99n,true,false),v3SwapCase('v3-token0-zero-token-delta',v3t0,0n,100n,100n,false),
+ v3SwapCase('v3-token1-buy',v3t1,100n,-5n,100n,true),v3SwapCase('v3-token1-sell',v3t1,-100n,5n,100n,false),
+ v3SwapCase('v3-int256-min-quote',v3t0,-5n,I256_MIN,1n<<255n,true),v3SwapCase('v3-int256-max-quote',v3t0,5n,I256_MAX,I256_MAX,false)];
 const real=JSON.parse(readFileSync(new URL('nitro-117903561.json',import.meta.url),'utf8'));
 const realTerms=terms(4);
 realTerms.entrants[0]=real.poolKey.currency1.toLowerCase();
@@ -95,7 +126,7 @@ const badHeaders=[
  {label:'trailing byte',rlp:real.block.canonicalHeaderRlp+'00'},{label:'truncated header',rlp:real.block.canonicalHeaderRlp.slice(0,-2)},
  {label:'noncanonical long length',rlp:'0xfa000223'+real.block.canonicalHeaderRlp.slice(8)}
 ];
-const result={generator:'viem 2.56.1 encodeAbiParameters/decodeAbiParameters/keccak256/toRlp; independent of Rust implementation',cases,signedVenues,swaps,attribution,
+const result={generator:'viem 2.56.1 encodeAbiParameters/decodeAbiParameters/keccak256/toRlp; independent of Rust implementation',cases,signedVenues,swaps,attribution,v3Swaps,
  real:{terms:jsonTerms(realTerms),termsAbi:termsAbi(realTerms),expectedParentHash:realHeaderFields[0],expectedNumber:'117903561',expectedGasLimit:BigInt(realHeaderFields[9]).toString(),expectedGasUsed:BigInt(realHeaderFields[10]).toString(),expectedTimestamp:BigInt(realHeaderFields[11]).toString(),expectedBaseFee:word(BigInt(realHeaderFields[15]))},badHeaders};
 writeFileSync(new URL('abi-vectors.json',import.meta.url),JSON.stringify(result,(_,v)=>typeof v==='bigint'?v.toString():v,2)+'\n');
-console.log(`Generated ${cases.length} complete terms/journal vectors, ${signedVenues.length} signed venue vectors, ${swaps.length} swap vectors, ${badHeaders.length} invalid headers with viem ${version}.`);
+console.log(`Generated ${cases.length} complete terms/journal vectors, ${signedVenues.length} signed venue vectors, ${swaps.length} swap vectors, ${v3Swaps.length} V3 swap vectors, ${badHeaders.length} invalid headers with viem ${version}.`);

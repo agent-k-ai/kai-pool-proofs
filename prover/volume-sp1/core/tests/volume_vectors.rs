@@ -2,7 +2,7 @@
 mod common;
 use common::*;
 use kai_volume_core::{
-    accumulate_checked, qualify_v4, DecodedLog, Error, Hash, VolumeAccumulator, U256,
+    accumulate_checked, qualify_v4, DecodedLog, Error, Hash, VolumeAccumulator, I256, U256,
 };
 #[test]
 fn canonical_v4_vectors_match_viem_signed_values_and_quote_semantics() {
@@ -25,19 +25,23 @@ fn canonical_v4_vectors_match_viem_signed_values_and_quote_semantics() {
         let result = result.unwrap();
         assert_eq!(
             result.amount0,
-            expected["amount0"]
-                .as_str()
-                .unwrap()
-                .parse::<i128>()
-                .unwrap()
+            I256::from(
+                expected["amount0"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<i128>()
+                    .unwrap()
+            )
         );
         assert_eq!(
             result.amount1,
-            expected["amount1"]
-                .as_str()
-                .unwrap()
-                .parse::<i128>()
-                .unwrap()
+            I256::from(
+                expected["amount1"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<i128>()
+                    .unwrap()
+            )
         );
         assert_eq!(result.quote_amount, uint(&expected["quoteAmount"]));
         assert_eq!(
@@ -71,7 +75,7 @@ fn real_decoded_native_log_matches_the_recorded_quote_amount() {
             accepted += 1;
             assert_eq!(swap.quote_amount, U256::from(1_000_000_000_000_000u64));
             assert_eq!(swap.sender, address(&fixture["expectedSwap"]["sender"]));
-            assert_eq!(swap.amount0, -1_000_000_000_000_000i128);
+            assert_eq!(swap.amount0, I256::from(-1_000_000_000_000_000i128));
             assert!(swap.token_is_output);
         }
     }
@@ -224,10 +228,10 @@ fn buy_and_sell_both_add_absolute_volume_and_mask_cannot_create_coverage() {
         assert!(VolumeAccumulator::new(&t, mask).is_err());
     }
     let mut unknown = t;
-    unknown.venues[0].kind = 2;
+    unknown.venues[0].kind = 3;
     assert!(matches!(
         VolumeAccumulator::new(&unknown, 7),
-        Err(Error::UnsupportedVenue(2))
+        Err(Error::UnsupportedVenue(3))
     ));
 }
 #[test]
