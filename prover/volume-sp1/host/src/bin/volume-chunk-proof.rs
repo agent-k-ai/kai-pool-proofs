@@ -11,8 +11,8 @@ use sp1_sdk::{
 use std::{error::Error, fs, path::Path, time::Instant};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-const GUEST_SOURCE: &str = "00aba6b1646879fe6c6f485bb530437caeb22988";
-const GUEST_SHA256: &str = "6e74010b78aee1d7de9abf760cc7fe620d0539f25d6a4fe61120e3d23fa4e855";
+const GUEST_SOURCE: &str = "598f94eb09fb5d8f5f0beb8b29ade20de5832738";
+const GUEST_SHA256: &str = "65f03aa5cb1a26e6640f4a100174e721020b13450a7ffe201c8fa3d3d5ed6fbd";
 
 fn sha(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))

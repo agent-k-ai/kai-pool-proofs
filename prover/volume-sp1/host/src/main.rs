@@ -85,8 +85,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let metrics = serde_json::json!({
         "release":env!("CARGO_PKG_VERSION"), "status":"execution-only",
-        "guestSourceCommit": if hex::encode(Sha256::digest(&elf_bytes)) == "6e74010b78aee1d7de9abf760cc7fe620d0539f25d6a4fe61120e3d23fa4e855" {
-            Some("00aba6b1646879fe6c6f485bb530437caeb22988")
+        "guestSourceCommit": if hex::encode(Sha256::digest(&elf_bytes)) == "65f03aa5cb1a26e6640f4a100174e721020b13450a7ffe201c8fa3d3d5ed6fbd" {
+            Some("598f94eb09fb5d8f5f0beb8b29ade20de5832738")
         } else { None },
         "sp1Version":"6.7.0", "circuitVersion":SP1_CIRCUIT_VERSION.trim(), "gasCalculation":true, "exitCode":report.exit_code,
         "backend":"LightProver CPU execution", "cryptographicProofGenerated":false,

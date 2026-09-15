@@ -10,8 +10,7 @@ fn suite() -> VolumeProofSuiteV1 {
     VolumeProofSuiteV1 {
         domain: suite_domain(),
         chunk_program_vkey: pack31(&[
-            1986971748, 1892815330, 174508314, 34582818, 2046232971, 601282695, 1261752062,
-            1506704924,
+            782104370, 571696777, 782329381, 494062471, 320110765, 855023949, 1181609130, 157131664,
         ])
         .unwrap(),
         range_program_vkey: pack31(&[1, 2, 3, 4, 5, 6, 7, 8]).unwrap(),
@@ -81,7 +80,7 @@ fn authoritative_192_byte_suite_vector() {
     );
     assert_eq!(
         hex::encode(s.chunk_program_vkey),
-        "00ecdd90c9c3484788533648d020fb122f3ee13168f5b621e59a677f59ce7e1c"
+        "005d3bee64884d9a25750b3129d72cb872629015acbda8536336f655095da390"
     );
     assert_eq!(
         hex::encode(s.range_program_vkey),
@@ -91,7 +90,7 @@ fn authoritative_192_byte_suite_vector() {
     assert_eq!(VolumeProofSuiteV1::abi_decode(&b).unwrap(), s);
     assert_eq!(
         hex::encode(s.suite_hash().unwrap()),
-        "26af7ac7e86edecd98df0e0ced63b6fd5892bdeb220db5d7bdff1cf29ef59c73"
+        "780e2ee694dc9917265bf42d1e50c4783c9f6f8a68cc639a2e11db0ee37100ca"
     );
     let mut bad = b;
     bad[96] = 1;

@@ -70,7 +70,7 @@ the cryptographic evidence. The exact source interpretation is retained in
 ## Identities
 
 Base source: `408a65fa49db823e490d27b91feb4c687e185250`.
-Retained chunk guest source: `00aba6b1646879fe6c6f485bb530437caeb22988`.
+Retained chunk guest source: `598f94eb09fb5d8f5f0beb8b29ade20de5832738` (kind-2 Uniswap V3 venues, zero hooks, terms-carried chain id; re-frozen 2026-09-15 from the `00aba6b` line).
 The clean final local release-e commit/parent/branch are recorded in
 `SOURCE-COMMIT.json`, alongside the delivered patch and bundle. The pre-run
 source manifest hashes the exact 91 build-source/interface/fixture files, all
@@ -83,14 +83,14 @@ No source/manifest identity is inserted into its own guest build.
 
 | Identity | Value |
 | --- | --- |
-| Chunk ELF, 300,616 bytes, SHA-256 | `6e74010b78aee1d7de9abf760cc7fe620d0539f25d6a4fe61120e3d23fa4e855` |
+| Chunk ELF, 307,088 bytes, SHA-256 | `65f03aa5cb1a26e6640f4a100174e721020b13450a7ffe201c8fa3d3d5ed6fbd` |
 | Range ELF, 362,888 bytes, SHA-256 | `1d9d837677c3f363f3b7a0ee9f7117a3d1cdbc23d0c18df61727fe6872a8aadd` |
-| Chunk SDK program VK bytes32 | `0x00ecdd90c9c3484788533648d020fb122f3ee13168f5b621e59a677f59ce7e1c` |
+| Chunk SDK program VK bytes32 | `0x005d3bee64884d9a25750b3129d72cb872629015acbda8536336f655095da390` |
 | Range SDK program VK bytes32 | `0x00f9a794e2d64a86dca48bb66e37b7ee87294a7fac27fdecbbd5bd0f41f6c00a` |
-| Chunk serialized VK SHA-256 | `5449444db6a4acad980f122929b4f6265cc8ef07ae737745c24d5299dcc2b5a1` |
+| Chunk serialized VK SHA-256 | `2f4d5de3b60fe2cd2bf1a5a90efa68370c44ae1eb3994a429c0cd44b3445b5b3` |
 | Range serialized VK SHA-256 | `16f5ec78bbaaa8ba211dc5a0ada672df3b78ee7c354d91cb257b694f413f3a48` |
-| Suite preimage, 192 bytes, SHA-256 | `37911952e34e41e922579e1f4fa3d6c2fd70916322cbc67dbc2a85399b028067` |
-| Suite Ethereum Keccak-256 | `83420be21ff897bdd3452c928ab57f1588ed5d743daaf62564be5ec10583d4ec` |
+| Suite preimage, 192 bytes, SHA-256 | `a32047d413b9303ae8c6dee9f2d3a6319984f27afad3382fcc348cf3601bb31f` |
+| Suite Ethereum Keccak-256 | `41985ba0b3a5662670dbfb5d2a090aaf4d5c6ba1cb2d84da879d165d583c9a14` |
 | Terms ABI, 4,352 bytes, SHA-256 | `b086ecdd68b638eea6e5bb9b5f1447b4ef67bd633930140f3f20bf10362c82ff` |
 | Terms Ethereum Keccak-256 | `f0976d5c768e2f2ec64084ea300f21ef5ab9f3867308b8fe23383e5870bf8e81` |
 | Source manifest SHA-256 | `0f2e8449d2c8dc693e4b0f3e51177acec37cda3a59ad26f5b64a2a1be72bca78` |

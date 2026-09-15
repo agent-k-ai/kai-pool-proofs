@@ -81,7 +81,7 @@ decide what the guest will accept.
 ## Sources
 
 - `prover/volume-sp1/chunk/src/receipt.rs` at revision `3cbabe7` (imported,
-  pre-re-freeze). The chunk adapter was later re-frozen to `00aba6b1646879fe6c6f485bb530437caeb22988`; this comparison
+  pre-re-freeze). The chunk adapter was later re-frozen to `00aba6b1646879fe6c6f485bb530437caeb22988` and then to `598f94eb09fb5d8f5f0beb8b29ade20de5832738`; this comparison
   was not re-run against that revision.
 - `experiments/complete-race-proof/receipt` at `62f7b15`
   (`feat/volume-receipt-decoded-20260912`).

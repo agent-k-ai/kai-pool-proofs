@@ -19,7 +19,7 @@ use sp1_sdk::{
 };
 use std::{error::Error, fs, path::Path, time::Instant};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-const CHUNK_ELF_SHA256: &str = "6e74010b78aee1d7de9abf760cc7fe620d0539f25d6a4fe61120e3d23fa4e855";
+const CHUNK_ELF_SHA256: &str = "65f03aa5cb1a26e6640f4a100174e721020b13450a7ffe201c8fa3d3d5ed6fbd";
 // SDK 6.7.0 embeds the runner override at BUILD time. A runtime environment
 // variable cannot relocate it. Refuse a different path instead of silently
 // executing an unpinned helper; public users build with their own pinned path.

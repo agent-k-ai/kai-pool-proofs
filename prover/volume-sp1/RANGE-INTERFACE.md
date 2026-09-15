@@ -124,8 +124,8 @@ cargo build --offline --locked --release -j 4 -p volume-chunk-host --bin volume-
 ```
 
 Set `SP1_CORE_RUNNER_OVERRIDE_BINARY` to the checksum-verified retained runner.
-The chunk ELF is the retained source `00aba6b` binary, enforced by SHA-256
-`6e74010b78aee1d7de9abf760cc7fe620d0539f25d6a4fe61120e3d23fa4e855`.
+The chunk ELF is the retained source `598f94e` binary, enforced by SHA-256
+`65f03aa5cb1a26e6640f4a100174e721020b13450a7ffe201c8fa3d3d5ed6fbd`.
 The new guest is at
 `$CARGO_TARGET_DIR/elf-compilation/riscv64im-succinct-zkvm-elf/release/volume-range-guest`.
 
