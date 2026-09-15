@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { concatHex, fromRlp, keccak256, toRlp, type Address, type Hex } from "viem";
+import { concatHex, fromRlp, getAddress, keccak256, toRlp, type Address, type Hex } from "viem";
 import {
   EMPTY_RECEIPTS_ROOT,
   CONTEXT_BYTES,
@@ -24,7 +24,9 @@ import {
   encodeContext,
   encodeFrameFile,
   encodeTermsAbi,
+  expectedPoolId,
   hashedTrieNodes,
+  poolKeyHash,
   termsHash,
   validateMask,
   validateGuestReceiptCompat,
@@ -150,7 +152,7 @@ describe("terms ABI", () => {
       mutate(t);
       expect(() => encodeTermsAbi(t)).toThrow();
     };
-    bad((t) => (t.chainId = 1));
+    bad((t) => (t.chainId = 0));
     bad((t) => (t.headerFormat = 1));
     bad((t) => (t.raceId = 0n));
     bad((t) => (t.controller = "0x0000000000000000000000000000000000000000"));
@@ -166,6 +168,7 @@ describe("terms ABI", () => {
     bad((t) => (t.entrants[4] = "0x1111111111111111111111111111111111111111"));
     bad((t) => (t.entrantsHash = `0x${"11".repeat(32)}`));
     bad((t) => (t.entrants[1] = t.entrants[0]!));
+    // kind 2 exists, but a V4-shaped venue relabelled as a V3 pool fails its pool-id rule
     bad((t) => (t.venues[0]!.kind = 2));
     bad((t) => (t.venues[0]!.minNotional = 0n));
     bad((t) => {
@@ -687,5 +690,105 @@ describe("captureChunkFrames", () => {
     await expect(
       captureChunkFrames({ rpc, chainId: 46630, context }),
     ).rejects.toThrow("CHUNK_RECEIPTS_INVALID");
+  });
+});
+describe("kind-2 (Uniswap V3) venues and the terms-carried chain id", () => {
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
+  const ZERO_WORD = `0x${"00".repeat(32)}` as Hex;
+  const POOL = getAddress(`0x${"e5".padStart(40, "0")}`);
+  const addressWord = (a: Address): Hex => `0x${"00".repeat(12)}${a.slice(2).toLowerCase()}`;
+
+  /** The golden terms with entrant 1 moved to a V3 pool: token below the wrapper, so token = currency0. */
+  function v3Terms(): VolumeTermsV1 {
+    const t = decodeTermsAbi(TERMS_ABI_REAL);
+    const token = t.entrants[1]!;
+    const quote = t.wrappedNative;
+    expect(lowerHex(token) < lowerHex(quote)).toBe(true);
+    t.venues[1] = {
+      kind: 2,
+      account: POOL,
+      accountCodeHash: keccak256("0x01"),
+      currency0: token,
+      currency1: quote,
+      fee: 3000,
+      tickSpacing: 0,
+      hooks: ZERO_ADDRESS,
+      hookCodeHash: ZERO_WORD,
+      poolId: addressWord(POOL),
+      quoteAsset: quote,
+      minNotional: 100n,
+    };
+    return t;
+  }
+
+  it("accepts a kind-2 venue with the pool address as poolId and no hook, round-tripping byte-identically", () => {
+    const t = v3Terms();
+    const encoded = encodeTermsAbi(t);
+    const decoded = decodeTermsAbi(encoded);
+    expect(decoded.venues[1]).toEqual(t.venues[1]);
+    expect(decoded.venues[1]!.kind).toBe(2);
+    expect(encodeTermsAbi(decoded)).toBe(encoded);
+    expect(expectedPoolId(t.venues[1]!)).toBe(addressWord(POOL));
+    expect(expectedPoolId(t.venues[0]!)).toBe(poolKeyHash(t.venues[0]!));
+    expect(termsHash(t)).not.toBe(termsHash(decodeTermsAbi(TERMS_ABI_REAL)));
+  });
+
+  it("accepts a hookless kind-1 venue when its hook code hash is zero too", () => {
+    const t = decodeTermsAbi(TERMS_ABI_REAL);
+    t.venues[0]!.hooks = ZERO_ADDRESS;
+    t.venues[0]!.hookCodeHash = ZERO_WORD;
+    t.venues[0]!.poolId = poolKeyHash(t.venues[0]!);
+    expect(decodeTermsAbi(encodeTermsAbi(t)).venues[0]).toEqual(t.venues[0]);
+  });
+
+  it("refuses the wrong pool-id rule per kind, half-pinned hooks, unknown kinds, and mixed kinds on one account", () => {
+    const bad = (mutate: (t: VolumeTermsV1) => void, code: string): void => {
+      const t = v3Terms();
+      mutate(t);
+      expect(() => encodeTermsAbi(t)).toThrow(code);
+    };
+    bad((t) => (t.venues[1]!.poolId = poolKeyHash(t.venues[1]!)), "CHUNK_TERMS_POOL_ID");
+    bad((t) => (t.venues[0]!.poolId = addressWord(t.venues[0]!.account)), "CHUNK_TERMS_POOL_ID");
+    bad((t) => (t.venues[0]!.kind = 2), "CHUNK_TERMS_POOL_ID");
+    bad((t) => (t.venues[1]!.kind = 3), "CHUNK_TERMS_VENUE");
+    bad((t) => (t.venues[1]!.kind = 0), "CHUNK_TERMS_VENUE");
+    bad((t) => (t.venues[1]!.hooks = t.venues[0]!.hooks), "CHUNK_TERMS_HOOK");
+    bad((t) => (t.venues[1]!.hookCodeHash = keccak256("0x02")), "CHUNK_TERMS_HOOK");
+    bad((t) => (t.venues[0]!.hookCodeHash = ZERO_WORD), "CHUNK_TERMS_HOOK");
+    bad((t) => (t.venues[1]!.accountCodeHash = ZERO_WORD), "CHUNK_TERMS_VENUE");
+    bad((t) => (t.venues[1]!.minNotional = 0n), "CHUNK_TERMS_VENUE");
+    bad((t) => (t.venues[2]!.account = POOL), "CHUNK_TERMS_VENUE");
+    bad((t) => (t.venues[1]!.quoteAsset = t.entrants[2]!), "CHUNK_TERMS_QUOTE");
+  });
+
+  it("takes the chain id from the terms: any nonzero id is accepted and bound, zero is refused", () => {
+    const base = decodeTermsAbi(TERMS_ABI_REAL);
+    const mainnet = decodeTermsAbi(TERMS_ABI_REAL);
+    mainnet.chainId = 4663;
+    const encoded = encodeTermsAbi(mainnet);
+    expect(encoded.slice(2 + 3 * 64, 2 + 4 * 64)).toBe(`${"00".repeat(30)}1237`);
+    expect(decodeTermsAbi(encoded).chainId).toBe(4663);
+    expect(termsHash(mainnet)).not.toBe(termsHash(base));
+    const zero = decodeTermsAbi(TERMS_ABI_REAL);
+    zero.chainId = 0;
+    expect(() => encodeTermsAbi(zero)).toThrow("CHUNK_TERMS_PROFILE");
+    const fraction = decodeTermsAbi(TERMS_ABI_REAL);
+    fraction.chainId = 1.5;
+    expect(() => encodeTermsAbi(fraction)).toThrow("CHUNK_TERMS_PROFILE");
+    const format = decodeTermsAbi(TERMS_ABI_REAL);
+    format.headerFormat = 1;
+    expect(() => encodeTermsAbi(format)).toThrow("CHUNK_TERMS_PROFILE");
+  });
+
+  it("refuses a capture whose chain id argument differs from the terms", async () => {
+    const context = goldenContext();
+    expect(context.terms.chainId).toBe(46630);
+    await expect(
+      captureChunkFrames({
+        rpc: captureRpc("0x1237", new Map(), new Map()),
+        chainId: 4663,
+        context,
+      }),
+    ).rejects.toThrow("CHUNK_CHAIN_MISMATCH");
   });
 });

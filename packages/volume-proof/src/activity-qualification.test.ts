@@ -6,7 +6,9 @@
  * Apache-2.0. Copyright 2026 Alpha Tech Organization.
  */
 import { describe, expect, it } from "vitest";
-import { encodeAbiParameters, keccak256, type Address, type Hex } from "viem";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { encodeAbiParameters, getAddress, keccak256, type Address, type Hex } from "viem";
 import {
   V3_SWAP_TOPIC,
   V4_SWAP_TOPIC,
@@ -346,5 +348,64 @@ describe("venue qualification", () => {
       swap,
     });
     expect(q).toBeNull();
+  });
+});
+describe("real mainnet V3 fixture", () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      fileURLToPath(new URL("../../../fixtures/volume-chunk/v3-swap-4663-64028601.json", import.meta.url)),
+      "utf8",
+    ),
+  ) as {
+    chainId: number;
+    pool: { address: Address; token0: Address; token1: Address; fee: number; tickSpacing: number };
+    block: { numberHex: Hex; number: number };
+    log: { address: Address; topics: Hex[]; data: Hex; dataByteLength: number };
+    expectedSwap: { sender: Address; amount0: string; amount1: string; quoteAmount: string; tokenIsOutput: boolean };
+  };
+
+  it("decodes the captured PONS/WETH pool Swap log from the pool perspective", () => {
+    expect(fixture.chainId).toBe(4663);
+    expect(fixture.block.number).toBe(Number(BigInt(fixture.block.numberHex)));
+    expect(fixture.log.topics[0]).toBe(V3_SWAP_TOPIC);
+    expect(fixture.log.topics).toHaveLength(3);
+    expect((fixture.log.data.length - 2) / 2).toBe(160);
+    const decoded = decodeV3SwapLog(fixture.log);
+    expect(decoded.poolPerspective).toBe(true);
+    expect(decoded.poolId).toBe(`0x${"00".repeat(12)}${fixture.pool.address.slice(2).toLowerCase()}`);
+    expect(decoded.sender).toBe(getAddress(fixture.expectedSwap.sender));
+    expect(decoded.amount0).toBe(BigInt(fixture.expectedSwap.amount0));
+    expect(decoded.amount1).toBe(BigInt(fixture.expectedSwap.amount1));
+    expect(decoded.amount0).toBe(-41_850_055_322_078_241n);
+    expect(decoded.amount1).toBe(160_000_000_000_000_000_000n);
+  });
+
+  it("qualifies the real swap as PONS volume in WETH, a sell of the entrant token", () => {
+    const weth = getAddress(fixture.pool.token0);
+    const pons = getAddress(fixture.pool.token1);
+    expect(weth).toBe(WETH);
+    const q = qualifyActivitySwap({
+      entrants: [pons],
+      metric: 1,
+      wrapper: weth,
+      raceQuoteAsset: weth,
+      minNotional: { [weth]: 1n },
+      poolKey: {
+        currency0: weth,
+        currency1: pons,
+        fee: fixture.pool.fee,
+        tickSpacing: fixture.pool.tickSpacing,
+        hooks: "0x0000000000000000000000000000000000000000",
+      },
+      swap: decodeV3SwapLog(fixture.log),
+    });
+    if (q === null) throw new Error("expected qualification");
+    expect(q.entrantIndex).toBe(0);
+    expect(q.token).toBe(pons);
+    expect(q.quoteAsset).toBe(weth);
+    expect(q.quoteAmount).toBe(BigInt(fixture.expectedSwap.quoteAmount));
+    expect(q.quoteAmount).toBe(41_850_055_322_078_241n);
+    expect(q.tokenIsOutput).toBe(fixture.expectedSwap.tokenIsOutput);
+    expect(q.tokenIsOutput).toBe(false);
   });
 });

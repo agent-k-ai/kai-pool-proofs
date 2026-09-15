@@ -1,0 +1,77 @@
+{
+  "kind": "real captured public mainnet (chain 4663) Uniswap V3 pool Swap log, already decoded, for kind-2 venue qualification; no receipt parser in this crate",
+  "chainId": 4663,
+  "chainIdHex": "0x1237",
+  "source": {
+    "rpc": "https://rpc.mainnet.chain.robinhood.com",
+    "readOnly": true,
+    "capturedAtUtc": "2026-09-15T23:12:00Z",
+    "methods": [
+      "eth_chainId",
+      "eth_blockNumber",
+      "eth_getLogs (address+topic0, 2,000-block window ending 0x3d101f6, 13 logs)",
+      "eth_getTransactionReceipt",
+      "eth_getBlockByNumber",
+      "eth_getCode",
+      "eth_call token0()/token1()/fee()/tickSpacing()"
+    ],
+    "userAgent": "browser User-Agent string; the endpoint answers read-only JSON-RPC"
+  },
+  "pool": {
+    "address": "0xed50bdeea8adc232f159486192a4157281d722ff",
+    "label": "Uniswap V3 PONS/WETH 0.30%",
+    "token0": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "token0Label": "WETH (race quote)",
+    "token1": "0x39dbed3a2bd333467115de45665cc57f813c4571",
+    "token1Label": "PONS (entrant)",
+    "fee": 3000,
+    "tickSpacing": 60,
+    "codeHash": "0x195c7d777448794bd8ebe573f2d4a4007abf142d9fcb895ef38603f4de8c2672",
+    "codeByteLength": 22142,
+    "codeAtBlock": "0x3d0ffb9"
+  },
+  "block": {
+    "numberHex": "0x3d0ffb9",
+    "number": 64028601,
+    "hash": "0x5fa326e694b3ab474c569fc72916d242be3b25146c08a91abcf85b044d7fddcc",
+    "parentHash": "0xf61749f14dbb4d1480b727b5c3214d9942ff943db9340c8136b57915a1d83e18",
+    "receiptsRoot": "0xf3639ed9ef476b84773ab29092b511ecf501600580c34b120e6d74e26f46ac69",
+    "timestamp": "0x6aa9ceb8",
+    "transactionCount": 6
+  },
+  "transaction": {
+    "hash": "0xfd884e880ecc6d20ccd7de6bc9f652de49be53363885bd905504b5bf5f0a87b2",
+    "index": 1,
+    "type": "0x2",
+    "status": "0x1",
+    "logCount": 6
+  },
+  "log": {
+    "address": "0xed50bdeea8adc232f159486192a4157281d722ff",
+    "topics": [
+      "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67",
+      "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904",
+      "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904"
+    ],
+    "data": "0xffffffffffffffffffffffffffffffffffffffffffffffffff6b5198aeb273df000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000003dbd3aa27e669102f940016906000000000000000000000000000000000000000000005d1802e1b6a9d37684c9000000000000000000000000000000000000000000000000000000000001421e",
+    "logIndex": 2,
+    "dataByteLength": 160
+  },
+  "expectedSwap": {
+    "sender": "0x8876789976dEcBfCbBbe364623C63652db8C0904",
+    "recipient": "0x8876789976dEcBfCbBbe364623C63652db8C0904",
+    "amount0": "-41850055322078241",
+    "amount1": "160000000000000000000",
+    "sqrtPriceX96": "4891481465278947129590261311750",
+    "liquidity": "439623012412544383354057",
+    "tick": 82462,
+    "perspective": "pool: positive means the pool received the token",
+    "quoteSide": "token0 (WETH)",
+    "quoteAmount": "41850055322078241",
+    "quoteAmountWord": "0x0000000000000000000000000000000000000000000000000094ae67514d8c21",
+    "entrantSide": "token1 (PONS)",
+    "tokenIsOutput": false,
+    "note": "the pool received 160 PONS and paid 0.041850055322078241 WETH: a sell of the entrant token"
+  },
+  "limits": "Decoded-log qualification only. No canonical-chain, receipt membership or full coverage assertion."
+}

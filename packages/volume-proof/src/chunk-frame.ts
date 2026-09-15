@@ -46,6 +46,7 @@ export const CHUNK_FRAMING_VERSION = 1;
 export const MAX_ENTRANTS = 8;
 export const MIN_ENTRANTS = 3;
 export const VENUE_V4_POOL = 1;
+export const VENUE_V3_POOL = 2;
 export const DYNAMIC_FEE_FLAG = 0x800000;
 /** The canonical receipts-trie root of a block with zero receipts. */
 export const EMPTY_RECEIPTS_ROOT = keccak256("0x80");
@@ -232,6 +233,16 @@ export function poolKeyHash(venue: VolumeVenueV1): Hex {
   );
 }
 
+/**
+ * The pool identity the terms must carry: kind 1 hashes the V4 pool key,
+ * kind 2 is the pinned pool address as a left-padded word.
+ */
+export function expectedPoolId(venue: VolumeVenueV1): Hex {
+  if (venue.kind === VENUE_V4_POOL) return poolKeyHash(venue);
+  if (venue.kind === VENUE_V3_POOL) return addressWord(venue.account);
+  return fail("CHUNK_TERMS_VENUE");
+}
+
 /** The coverage mask must be nonempty and inside the entrant range. */
 export function validateMask(mask: number, entrantCount: number): void {
   if (!Number.isInteger(entrantCount) || entrantCount < MIN_ENTRANTS || entrantCount > MAX_ENTRANTS) {
@@ -250,7 +261,12 @@ export function validateMask(mask: number, entrantCount: number): void {
 export function validateTerms(terms: VolumeTermsV1): void {
   const n = terms.entrantCount;
   if (!Number.isInteger(n) || n < MIN_ENTRANTS || n > MAX_ENTRANTS) fail("CHUNK_TERMS_INVALID");
-  if (terms.chainId !== 46630 || terms.headerFormat !== 0) fail("CHUNK_TERMS_PROFILE");
+  // The chain id is carried by the terms (bound by the terms hash and checked on
+  // chain against the deployment); the frame requires a nonzero id and the Nitro
+  // header profile.
+  if (!Number.isInteger(terms.chainId) || terms.chainId <= 0 || terms.headerFormat !== 0) {
+    fail("CHUNK_TERMS_PROFILE");
+  }
   if (terms.raceId === 0n) fail("CHUNK_TERMS_INVALID");
   const requiredAddresses = [
     terms.controller,
@@ -303,21 +319,22 @@ export function validateTerms(terms: VolumeTermsV1): void {
     if (token === ZERO_ADDRESS || terms.entrants.slice(0, i).includes(token)) {
       fail("CHUNK_TERMS_ENTRANT");
     }
-    if (v.kind !== VENUE_V4_POOL) fail("CHUNK_TERMS_VENUE");
-    if (
-      v.account === ZERO_ADDRESS ||
-      lowerHex(v.accountCodeHash) === ZERO_WORD ||
-      v.hooks === ZERO_ADDRESS ||
-      lowerHex(v.hookCodeHash) === ZERO_WORD ||
-      v.minNotional === 0n
-    ) {
+    if (v.kind !== VENUE_V4_POOL && v.kind !== VENUE_V3_POOL) fail("CHUNK_TERMS_VENUE");
+    if (v.account === ZERO_ADDRESS || lowerHex(v.accountCodeHash) === ZERO_WORD || v.minNotional === 0n) {
+      fail("CHUNK_TERMS_VENUE");
+    }
+    // A hook is pinned together with its code hash or absent with a zero code hash
+    // (hookless V4 pools and every V3 pool); a half-pinned hook is refused.
+    if ((v.hooks === ZERO_ADDRESS) !== (lowerHex(v.hookCodeHash) === ZERO_WORD)) fail("CHUNK_TERMS_HOOK");
+    // One emitter address maps to one venue kind, so guest log dispatch by emitter is unambiguous.
+    if (terms.venues.slice(0, i).some((p) => lowerHex(p.account) === lowerHex(v.account) && p.kind !== v.kind)) {
       fail("CHUNK_TERMS_VENUE");
     }
     const c0 = lowerHex(v.currency0);
     const c1 = lowerHex(v.currency1);
     if (!(c0 < c1) || (token !== v.currency0 && token !== v.currency1)) fail("CHUNK_TERMS_VENUE");
     if (v.fee >= DYNAMIC_FEE_FLAG) fail("CHUNK_TERMS_VENUE");
-    if (poolKeyHash(v) !== lowerHex(v.poolId)) fail("CHUNK_TERMS_POOL_ID");
+    if (expectedPoolId(v) !== lowerHex(v.poolId)) fail("CHUNK_TERMS_POOL_ID");
     if (terms.venues.slice(0, i).some((p) => lowerHex(p.poolId) === lowerHex(v.poolId))) {
       fail("CHUNK_TERMS_VENUE");
     }
@@ -771,6 +788,8 @@ export async function captureChunkFrames(args: {
   context: ChunkContext;
 }): Promise<CapturedChunk> {
   const { rpc, chainId, context } = args;
+  // The requested chain must be the chain the terms name, and the RPC must serve it.
+  if (chainId !== context.terms.chainId) fail("CHUNK_CHAIN_MISMATCH");
   if (Number(BigInt(await rpc.request<string>("eth_chainId", []))) !== chainId) {
     fail("CHUNK_CHAIN_MISMATCH");
   }
