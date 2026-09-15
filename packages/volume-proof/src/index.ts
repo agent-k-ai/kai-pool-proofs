@@ -39,3 +39,4 @@ export * from "./receipt-capture.js";
 export * from "./chunk-frame.js";
 export * from "./identity.js";
 export * from "./batching.js";
+export * from "./pool-key-recovery.js";
