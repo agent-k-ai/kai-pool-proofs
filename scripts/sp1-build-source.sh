@@ -22,7 +22,7 @@ mkdir "$build/chunk-source" "$build/range-source" "$build/provenance"
 # The recorded value is rev-parse of the same variable that was archived, so the
 # record cannot claim a commit the archive did not use. Values are checked against
 # prover/volume-sp1/NODE-BUILD-REFERENCE.json by scripts/sp1-record-build.py.
-CHUNK_SOURCE_COMMIT=00aba6b1646879fe6c6f485bb530437caeb22988
+CHUNK_SOURCE_COMMIT=598f94eb09fb5d8f5f0beb8b29ade20de5832738
 # Range source is pinned to the reviewed release, the same way as chunk. HEAD is a
 # mutable ref and this script's own contract forbids building from mutable inputs.
 RANGE_SOURCE_COMMIT=9a12b81f3587ccc4e903593fbd52c5ebeb7349eb
@@ -34,7 +34,7 @@ export CARGO_NET_OFFLINE=true RUSTUP_AUTO_INSTALL=0 GOPROXY=off GOTOOLCHAIN=loca
 export CARGO_BUILD_JOBS="$SP1_NODE_BUILD_JOBS" GOMAXPROCS="$SP1_NODE_BUILD_JOBS"
 (
   cd "$build/chunk-source"
-  CARGO_TARGET_DIR="$build/chunk-target" cargo run --offline --locked -j "$SP1_NODE_BUILD_JOBS" -p volume-chunk-build
+  CARGO_TARGET_DIR="$build/chunk-target" cargo run --offline --locked -j "$SP1_NODE_BUILD_JOBS" -p volume-chunk-build --bin volume-chunk-build
 )
 (
   cd "$build/range-source"
