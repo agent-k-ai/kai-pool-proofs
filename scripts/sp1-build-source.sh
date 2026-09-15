@@ -23,9 +23,9 @@ mkdir "$build/chunk-source" "$build/range-source" "$build/provenance"
 # record cannot claim a commit the archive did not use. Values are checked against
 # prover/volume-sp1/NODE-BUILD-REFERENCE.json by scripts/sp1-record-build.py.
 CHUNK_SOURCE_COMMIT=00aba6b1646879fe6c6f485bb530437caeb22988
-# Range source is the working release, so resolve HEAD once at run time. Recording
-# the resolved SHA is the point: the record must state what was archived.
-RANGE_SOURCE_COMMIT="$(git -C "$repo" rev-parse HEAD)"
+# Range source is pinned to the reviewed release, the same way as chunk. HEAD is a
+# mutable ref and this script's own contract forbids building from mutable inputs.
+RANGE_SOURCE_COMMIT=9a12b81f3587ccc4e903593fbd52c5ebeb7349eb
 git -C "$repo" archive "$CHUNK_SOURCE_COMMIT" prover/volume-sp1 | tar -xf - --strip-components=2 -C "$build/chunk-source"
 git -C "$repo" archive "$RANGE_SOURCE_COMMIT" prover/volume-sp1 | tar -xf - --strip-components=2 -C "$build/range-source"
 git -C "$repo" rev-parse "$CHUNK_SOURCE_COMMIT" > "$build/provenance/archived-chunk-commit.txt"

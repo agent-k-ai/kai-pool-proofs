@@ -28,6 +28,8 @@ def archived(role):
 archived_chunk=archived('chunk');archived_range=archived('range')
 if archived_chunk!=ref['chunkElf']['sourceCommit']:
     raise SystemExit('SP1_CHUNK_SOURCE_MISMATCH: archived %s but reference pins %s; never relabel old provenance'%(archived_chunk,ref['chunkElf']['sourceCommit']))
-record={'sourceCommit':commit,'chunkSourceCommit':archived_chunk,'rangeSourceCommit':archived_range,'rangeSourceCommitMatchesReference':archived_range==ref['rangeElf']['sourceCommit'],**files,'proofGenerated':False}
+if archived_range!=ref['rangeElf']['sourceCommit']:
+    raise SystemExit('SP1_RANGE_SOURCE_MISMATCH: archived %s but reference pins %s; never relabel old provenance'%(archived_range,ref['rangeElf']['sourceCommit']))
+record={'sourceCommit':commit,'chunkSourceCommit':archived_chunk,'rangeSourceCommit':archived_range,**files,'proofGenerated':False}
 (build/'provenance/build-files.json').write_text(json.dumps(record,indent=2)+'\n')
 print(json.dumps(record,indent=2))
