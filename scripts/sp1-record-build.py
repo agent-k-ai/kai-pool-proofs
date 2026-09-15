@@ -19,6 +19,15 @@ paths=subprocess.check_output(['git','-C',str(repo),'ls-files','-z']).decode().s
 source={'kind':'volume-sp1-source-manifest/v1','sourceCommit':commit,'files':{p:pin(repo/p)['sha256'] for p in paths if p}}
 source_file=build/'provenance/source-manifest.json';source_file.write_text(json.dumps(source,sort_keys=True,indent=2)+'\n')
 files['sourceManifest']=pin(source_file)
-record={'sourceCommit':commit,'chunkSourceCommit':ref['chunkElf']['sourceCommit'],'rangeSourceCommit':ref['rangeElf']['sourceCommit'],**files,'proofGenerated':False}
+# Derive the archived source commits from the build directory. Never copy them from
+# the reference: a copied value states the reference regardless of what was built.
+def archived(role):
+    f=build/'provenance'/('archived-%s-commit.txt'%role)
+    if not f.exists():raise SystemExit('SP1_%s_SOURCE_PROVENANCE_MISSING: %s'%(role.upper(),f))
+    return f.read_text().strip()
+archived_chunk=archived('chunk');archived_range=archived('range')
+if archived_chunk!=ref['chunkElf']['sourceCommit']:
+    raise SystemExit('SP1_CHUNK_SOURCE_MISMATCH: archived %s but reference pins %s; never relabel old provenance'%(archived_chunk,ref['chunkElf']['sourceCommit']))
+record={'sourceCommit':commit,'chunkSourceCommit':archived_chunk,'rangeSourceCommit':archived_range,'rangeSourceCommitMatchesReference':archived_range==ref['rangeElf']['sourceCommit'],**files,'proofGenerated':False}
 (build/'provenance/build-files.json').write_text(json.dumps(record,indent=2)+'\n')
 print(json.dumps(record,indent=2))
