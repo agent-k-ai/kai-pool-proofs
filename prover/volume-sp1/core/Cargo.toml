@@ -3,7 +3,7 @@ name = "kai-volume-core"
 version.workspace = true
 edition = "2021"
 license = "Apache-2.0"
-description = "Pure ABI, Nitro header and V4 volume primitives; not a proof verifier"
+description = "Pure ABI, Nitro header and V4/V3 volume primitives; not a proof verifier"
 
 
 [dependencies]

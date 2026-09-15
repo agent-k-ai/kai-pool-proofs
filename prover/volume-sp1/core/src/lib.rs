@@ -13,10 +13,14 @@ pub mod volume;
 pub use header::{parse_nitro_header, NitroHeader};
 pub use journal::{journal_domain, VolumeJournalV1, JOURNAL_ABI_BYTES};
 pub use terms::{
-    ValidatedTerms, VolumeTermsV1, VolumeVenueV1, MAX_ENTRANTS, TERMS_ABI_BYTES, VENUE_V4_POOL,
+    ValidatedTerms, VolumeTermsV1, VolumeVenueV1, MAX_ENTRANTS, TERMS_ABI_BYTES, VENUE_V3_POOL,
+    VENUE_V4_POOL,
 };
-pub use uint::U256;
-pub use volume::{accumulate_checked, qualify_v4, DecodedLog, QualifiedSwap, VolumeAccumulator};
+pub use uint::{I256, U256};
+pub use volume::{
+    accumulate_checked, qualify, qualify_v3, qualify_v4, DecodedLog, QualifiedSwap,
+    VolumeAccumulator, V3_SWAP_DATA_BYTES, V3_SWAP_TOPIC, V4_SWAP_DATA_BYTES, V4_SWAP_TOPIC,
+};
 
 pub type Address = [u8; 20];
 pub type Hash = [u8; 32];

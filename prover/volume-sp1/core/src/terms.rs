@@ -10,6 +10,7 @@ pub const MAX_ENTRANTS: usize = 8;
 pub const MIN_ENTRANTS: usize = 3;
 // PonsActivityRaceProofAdapter at 6302d37: VENUE_V4_POOL=1, VENUE_V3_POOL=2.
 pub const VENUE_V4_POOL: u8 = 1;
+pub const VENUE_V3_POOL: u8 = 2;
 pub const DYNAMIC_FEE_FLAG: u32 = 0x800000;
 pub const TERMS_ABI_BYTES: usize = 136 * 32;
 pub const VENUE_ABI_BYTES: usize = 12 * 32;
@@ -85,6 +86,19 @@ impl VolumeVenueV1 {
         push_i24(&mut out, self.tick_spacing)?;
         push_address(&mut out, self.hooks);
         Ok(keccak256(&out))
+    }
+    /// The pool identity the terms must carry: kind 1 hashes the V4 pool key, kind 2 is the
+    /// pinned pool address as a left-padded 32-byte word (`bytes32(uint160(pool))`).
+    pub fn expected_pool_id(&self) -> Result<Hash> {
+        match self.kind {
+            VENUE_V4_POOL => self.pool_key_hash(),
+            VENUE_V3_POOL => {
+                let mut id = [0u8; 32];
+                id[12..].copy_from_slice(&self.account);
+                Ok(id)
+            }
+            kind => Err(Error::UnsupportedVenue(kind)),
+        }
     }
 }
 
@@ -165,8 +179,10 @@ impl VolumeTermsV1 {
         if !(MIN_ENTRANTS..=MAX_ENTRANTS).contains(&n) {
             return Err(Error::Invalid("entrant count"));
         }
-        if self.chain_id != 46630 || self.header_format != 0 {
-            return Err(Error::Invalid("testnet Nitro profile"));
+        // The chain id is carried by the terms (bound by the terms hash and checked on chain
+        // against the deployment); the guest requires a nonzero id and the Nitro header profile.
+        if self.chain_id == 0 || self.header_format != 0 {
+            return Err(Error::Invalid("chain id/header profile"));
         }
         if self.race_id.is_zero() {
             return Err(Error::Invalid("race id"));
@@ -242,16 +258,23 @@ impl VolumeTermsV1 {
             if token == [0; 20] || self.entrants[..i].contains(&token) {
                 return Err(Error::Invalid("entrant duplicate/zero"));
             }
-            if v.kind != VENUE_V4_POOL {
+            if v.kind != VENUE_V4_POOL && v.kind != VENUE_V3_POOL {
                 return Err(Error::UnsupportedVenue(v.kind));
             }
-            if v.account == [0; 20]
-                || v.account_code_hash == [0; 32]
-                || v.hooks == [0; 20]
-                || v.hook_code_hash == [0; 32]
-                || v.min_notional.is_zero()
-            {
+            if v.account == [0; 20] || v.account_code_hash == [0; 32] || v.min_notional.is_zero() {
                 return Err(Error::Invalid("venue identity/notional"));
+            }
+            // A hook is pinned together with its code hash or absent with a zero code hash
+            // (hookless V4 pools and every V3 pool); a half-pinned hook is refused.
+            if (v.hooks == [0; 20]) != (v.hook_code_hash == [0; 32]) {
+                return Err(Error::Invalid("venue hook pin"));
+            }
+            // One emitter address maps to one venue kind, so log dispatch by emitter is unambiguous.
+            if self.venues[..i]
+                .iter()
+                .any(|prior| prior.account == v.account && prior.kind != v.kind)
+            {
+                return Err(Error::Invalid("venue account kind"));
             }
             if v.currency0 >= v.currency1 || (token != v.currency0 && token != v.currency1) {
                 return Err(Error::Invalid("venue currencies"));
@@ -259,7 +282,7 @@ impl VolumeTermsV1 {
             if v.fee >= DYNAMIC_FEE_FLAG {
                 return Err(Error::Invalid("dynamic fee"));
             }
-            if v.pool_key_hash()? != v.pool_id {
+            if v.expected_pool_id()? != v.pool_id {
                 return Err(Error::Invalid("pool id"));
             }
             if self.venues[..i]
