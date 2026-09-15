@@ -10,7 +10,14 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { concatHex, fromRlp, keccak256, toRlp, type Address, type Hex } from "viem";
+import {
+  concatHex,
+  fromRlp,
+  keccak256,
+  toRlp,
+  type Address,
+  type Hex,
+} from "viem";
 import {
   EMPTY_RECEIPTS_ROOT,
   CONTEXT_BYTES,
@@ -46,10 +53,15 @@ import {
 } from "./nitro-header.js";
 import type { ReadRpc } from "./rpc.js";
 
-const fixtureDir = fileURLToPath(new URL("../../../fixtures/volume-chunk/", import.meta.url));
+const fixtureDir = fileURLToPath(
+  new URL("../../../fixtures/volume-chunk/", import.meta.url),
+);
 
 const fixture = JSON.parse(
-  readFileSync(`${fixtureDir}block-117903561-receipt-decoder-fixture.json`, "utf8"),
+  readFileSync(
+    `${fixtureDir}block-117903561-receipt-decoder-fixture.json`,
+    "utf8",
+  ),
 ) as {
   fixture: {
     block: {
@@ -70,13 +82,22 @@ const fixture = JSON.parse(
   };
 };
 
-const GOLDEN_FRAMES = readFileSync(`${fixtureDir}real-block-synthetic-terms.frames`);
-const GOLDEN_JOURNAL = readFileSync(`${fixtureDir}real-block-synthetic-terms.journal`);
-const TERMS_ABI_REAL = readFileSync(`${fixtureDir}terms-abi-real.hex`, "utf8").trim() as Hex;
+const GOLDEN_FRAMES = readFileSync(
+  `${fixtureDir}real-block-synthetic-terms.frames`,
+);
+const GOLDEN_JOURNAL = readFileSync(
+  `${fixtureDir}real-block-synthetic-terms.journal`,
+);
+const TERMS_ABI_REAL = readFileSync(
+  `${fixtureDir}terms-abi-real.hex`,
+  "utf8",
+).trim() as Hex;
 
 const BENEFICIARY = `0x${"42".repeat(20)}` as Address;
 const BLOCK = fixture.fixture.block.number;
-const PARENT = decodeRobinhoodHeader(fixture.fixture.block.canonicalHeaderRlp).parentHash;
+const PARENT = decodeRobinhoodHeader(
+  fixture.fixture.block.canonicalHeaderRlp,
+).parentHash;
 
 function goldenTerms(): VolumeTermsV1 {
   const terms = decodeTermsAbi(TERMS_ABI_REAL);
@@ -144,7 +165,9 @@ describe("terms ABI", () => {
 
   it("rejects wrong length, wrong chain, zero identity, bad timing, padding, and venue faults", () => {
     const terms = decodeTermsAbi(TERMS_ABI_REAL);
-    expect(() => decodeTermsAbi(TERMS_ABI_REAL.slice(0, -2) as Hex)).toThrow("CHUNK_TERMS_LENGTH");
+    expect(() => decodeTermsAbi(TERMS_ABI_REAL.slice(0, -2) as Hex)).toThrow(
+      "CHUNK_TERMS_LENGTH",
+    );
     const bad = (mutate: (t: VolumeTermsV1) => void): void => {
       const t = decodeTermsAbi(TERMS_ABI_REAL);
       mutate(t);
@@ -160,7 +183,10 @@ describe("terms ABI", () => {
     bad((t) => (t.bettingCutoff = t.snapshotBlock + 1n));
     bad((t) => (t.quietBlocks = 0n));
     bad((t) => (t.historyWindow = 0n));
-    bad((t) => (t.confirmationBlocks = t.submissionDeadline - t.snapshotBlock + 1n));
+    bad(
+      (t) =>
+        (t.confirmationBlocks = t.submissionDeadline - t.snapshotBlock + 1n),
+    );
     bad((t) => (t.terminalExpiry = t.submissionDeadline + t.quietBlocks));
     bad((t) => (t.submissionDeadline = t.snapshotBlock + t.historyWindow));
     bad((t) => (t.entrants[4] = "0x1111111111111111111111111111111111111111"));
@@ -175,7 +201,11 @@ describe("terms ABI", () => {
     });
     bad((t) => (t.venues[0]!.fee = 0x800000));
     bad((t) => (t.venues[0]!.poolId = `0x${"22".repeat(32)}`));
-    bad((t) => (t.venues[0]!.quoteAsset = "0x3333333333333333333333333333333333333333"));
+    bad(
+      (t) =>
+        (t.venues[0]!.quoteAsset =
+          "0x3333333333333333333333333333333333333333"),
+    );
     bad((t) => (t.quoteDecimals = 6));
   });
 
@@ -183,8 +213,12 @@ describe("terms ABI", () => {
     const terms = decodeTermsAbi(TERMS_ABI_REAL);
     expect(validateMask(15, terms.entrantCount)).toBeUndefined();
     expect(validateMask(1, terms.entrantCount)).toBeUndefined();
-    expect(() => validateMask(0, terms.entrantCount)).toThrow("CHUNK_MASK_INVALID");
-    expect(() => validateMask(16, terms.entrantCount)).toThrow("CHUNK_MASK_INVALID");
+    expect(() => validateMask(0, terms.entrantCount)).toThrow(
+      "CHUNK_MASK_INVALID",
+    );
+    expect(() => validateMask(16, terms.entrantCount)).toThrow(
+      "CHUNK_MASK_INVALID",
+    );
     expect(() => validateMask(15, 2)).toThrow("CHUNK_MASK_INVALID");
     expect(() => validateMask(15, 9)).toThrow("CHUNK_MASK_INVALID");
   });
@@ -206,10 +240,14 @@ describe("context frame", () => {
 
   it("rejects wrong length, magic, version, zero beneficiary, and bad range", () => {
     const encoded = encodeContext(goldenContext());
-    expect(() => decodeContext(encoded.slice(0, -2) as Hex)).toThrow("CHUNK_CONTEXT_LENGTH");
-    const badMagic = `0x${Buffer.from("XXIVOLCH").toString("hex")}${encoded.slice(18)}` as Hex;
+    expect(() => decodeContext(encoded.slice(0, -2) as Hex)).toThrow(
+      "CHUNK_CONTEXT_LENGTH",
+    );
+    const badMagic =
+      `0x${Buffer.from("XXIVOLCH").toString("hex")}${encoded.slice(18)}` as Hex;
     expect(() => decodeContext(badMagic)).toThrow("CHUNK_CONTEXT_MAGIC");
-    const badVersion = `0x${encoded.slice(2, 18)}0002${encoded.slice(22)}` as Hex;
+    const badVersion =
+      `0x${encoded.slice(2, 18)}0002${encoded.slice(22)}` as Hex;
     expect(() => decodeContext(badVersion)).toThrow("CHUNK_CONTEXT_VERSION");
     const bad = (mutate: (c: ChunkContext) => void): void => {
       const context = goldenContext();
@@ -242,7 +280,9 @@ describe("block frame", () => {
   });
 
   it("rejects duplicate nodes, unsorted order, count overflow, trailing, and truncation", () => {
-    expect(() => encodeBlockFrame(header, [nodes[0]!, nodes[0]!])).toThrow("CHUNK_NODE_DUPLICATE");
+    expect(() => encodeBlockFrame(header, [nodes[0]!, nodes[0]!])).toThrow(
+      "CHUNK_NODE_DUPLICATE",
+    );
     const encoded = encodeBlockFrame(header, nodes);
     const headerLen = (header.length - 2) / 2;
     const len8 = (n: number): Hex => `0x${n.toString(16).padStart(16, "0")}`;
@@ -265,8 +305,12 @@ describe("block frame", () => {
       Buffer.from([0, 0, 0, 0, 0, 0, 0, 255]),
       buf.subarray(8 + headerLen + 8),
     ]);
-    expect(() => decodeBlockFrame(`0x${badCount.toString("hex")}` as Hex)).toThrow("CHUNK_FRAME_NODE_COUNT");
-    expect(() => decodeBlockFrame(`${encoded}00` as Hex)).toThrow("CHUNK_FRAME_TRAILING");
+    expect(() =>
+      decodeBlockFrame(`0x${badCount.toString("hex")}` as Hex),
+    ).toThrow("CHUNK_FRAME_NODE_COUNT");
+    expect(() => decodeBlockFrame(`${encoded}00` as Hex)).toThrow(
+      "CHUNK_FRAME_TRAILING",
+    );
     expect(() => decodeBlockFrame(encoded.slice(0, -4) as Hex)).toThrow();
   });
 
@@ -280,18 +324,25 @@ describe("block frame", () => {
 
 describe("portable file framing", () => {
   it("round-trips frames with u64 big-endian length prefixes", () => {
-    const frames = [encodeContext(goldenContext()), encodeBlockFrame(
-      fixture.fixture.block.canonicalHeaderRlp,
-      hashedTrieNodes(fixtureReceipts()),
-    )];
+    const frames = [
+      encodeContext(goldenContext()),
+      encodeBlockFrame(
+        fixture.fixture.block.canonicalHeaderRlp,
+        hashedTrieNodes(fixtureReceipts()),
+      ),
+    ];
     const file = encodeFrameFile(frames);
     expect(decodeFrameFile(file)).toEqual(frames.map((f) => lowerHex(f)));
   });
 
   it("rejects truncated and trailing file bytes", () => {
     const file = encodeFrameFile([encodeContext(goldenContext())]);
-    expect(() => decodeFrameFile(file.subarray(0, file.length - 1))).toThrow("CHUNK_FILE_TRUNCATED");
-    expect(() => decodeFrameFile(Buffer.concat([file, Buffer.from([0])]))).toThrow("CHUNK_FILE_TRUNCATED");
+    expect(() => decodeFrameFile(file.subarray(0, file.length - 1))).toThrow(
+      "CHUNK_FILE_TRUNCATED",
+    );
+    expect(() =>
+      decodeFrameFile(Buffer.concat([file, Buffer.from([0])])),
+    ).toThrow("CHUNK_FILE_TRUNCATED");
     expect(decodeFrameFile(Buffer.alloc(0))).toEqual([]);
   });
 });
@@ -302,9 +353,14 @@ describe("golden byte-for-byte compatibility", () => {
     const header = fixture.fixture.block.canonicalHeaderRlp;
     const receipts = fixtureReceipts();
     expect(keccak256(header)).toBe(fixture.fixture.block.hash);
-    expect(computeReceiptsRoot(receipts)).toBe(fixture.fixture.block.receiptsRoot);
+    expect(computeReceiptsRoot(receipts)).toBe(
+      fixture.fixture.block.receiptsRoot,
+    );
     expect(fixture.fixture.receiptsTrieCheck.keys).toEqual(["0x80", "0x01"]);
-    const frames = [encodeContext(context), encodeBlockFrame(header, hashedTrieNodes(receipts))];
+    const frames = [
+      encodeContext(context),
+      encodeBlockFrame(header, hashedTrieNodes(receipts)),
+    ];
     expect(encodeFrameFile(frames)).toEqual(GOLDEN_FRAMES);
     expect(GOLDEN_FRAMES.length).toBe(6525);
     expect(GOLDEN_JOURNAL.length).toBe(800);
@@ -346,10 +402,12 @@ describe("hashed node corpus", () => {
       logsBloom: `0x${"00".repeat(256)}` as Hex,
       logs: [],
     };
-    const receipts: IndexedBlockReceipt[] = [256, 257, 512, 513].map((transactionIndex) => ({
-      transactionIndex,
-      ...base,
-    }));
+    const receipts: IndexedBlockReceipt[] = [256, 257, 512, 513].map(
+      (transactionIndex) => ({
+        transactionIndex,
+        ...base,
+      }),
+    );
     const nodes = hashedTrieNodes(receipts);
     const hashes = nodes.map((node) => keccak256(node));
     // Eight nodes are visited (root, two inner branches, four leaves);
@@ -370,7 +428,8 @@ describe("hashed node corpus", () => {
 /** Rebuilds the 16-field JSON block shape from a canonical header RLP. */
 function headerToJson(header: Hex): RobinhoodRpcBlock {
   const fields = fromRlp(header) as Hex[];
-  if (!Array.isArray(fields) || fields.length !== 16) throw new Error("BAD_HEADER");
+  if (!Array.isArray(fields) || fields.length !== 16)
+    throw new Error("BAD_HEADER");
   return {
     parentHash: fields[0]!,
     sha3Uncles: fields[1]!,
@@ -484,7 +543,12 @@ function captureRpc(
       }
       throw new Error(`UNEXPECTED_METHOD_${method}`);
     },
-    head: async () => ({ number: 0n, hash: "0x00", parentHash: "0x00", timestamp: 0n }),
+    head: async () => ({
+      number: 0n,
+      hash: "0x00",
+      parentHash: "0x00",
+      timestamp: 0n,
+    }),
     block: async () => {
       throw new Error("NOT_USED");
     },
@@ -511,13 +575,18 @@ describe("guest receipt compatibility", () => {
     // 0x78 must be refused: upstream EncodeIndex writes ArbitrumLegacyTxType
     // unprefixed, so it is never a valid typed envelope byte.
     for (const type of [0x05, 0x63, 0x67, 0x6b, 0x78, 0x7f]) {
-      expect(() => validateGuestReceiptCompat(base(type))).toThrow("CHUNK_RECEIPT_TYPE");
+      expect(() => validateGuestReceiptCompat(base(type))).toThrow(
+        "CHUNK_RECEIPT_TYPE",
+      );
     }
   });
 
   it("refuses out-of-range cumulative gas", () => {
-    expect(
-      () => validateGuestReceiptCompat({ ...base(1), cumulativeGasUsed: 0x10000000000000000n }),
+    expect(() =>
+      validateGuestReceiptCompat({
+        ...base(1),
+        cumulativeGasUsed: 0x10000000000000000n,
+      }),
     ).toThrow("CHUNK_RECEIPT_GAS");
   });
 });
@@ -541,7 +610,10 @@ describe("captureChunkFrames", () => {
     };
     return {
       context,
-      blocks: new Map([[BLOCK, a], [BLOCK + 1, b]]),
+      blocks: new Map([
+        [BLOCK, a],
+        [BLOCK + 1, b],
+      ]),
       receipts: new Map([
         [BLOCK, fixtureReceiptJsons()],
         [
@@ -616,26 +688,36 @@ describe("captureChunkFrames", () => {
         context: ctx,
       });
 
-    await expect(run("0x1", context, blocks, receipts)).rejects.toThrow("CHUNK_CHAIN_MISMATCH");
+    await expect(run("0x1", context, blocks, receipts)).rejects.toThrow(
+      "CHUNK_CHAIN_MISMATCH",
+    );
 
     const gap = twoBlockScenario();
     const b = gap.blocks.get(BLOCK + 1)!;
     // The node serves a block whose number skips the requested height.
-    gap.blocks.set(BLOCK + 1, rehash({ ...b, number: `0x${(BLOCK + 2).toString(16)}` }));
-    await expect(run("0xb626", gap.context, gap.blocks, gap.receipts)).rejects.toThrow("CHUNK_BLOCK_GAP");
+    gap.blocks.set(
+      BLOCK + 1,
+      rehash({ ...b, number: `0x${(BLOCK + 2).toString(16)}` }),
+    );
+    await expect(
+      run("0xb626", gap.context, gap.blocks, gap.receipts),
+    ).rejects.toThrow("CHUNK_BLOCK_GAP");
 
     const parent = twoBlockScenario();
     const b2 = parent.blocks.get(BLOCK + 1)!;
-    parent.blocks.set(BLOCK + 1, rehash({ ...b2, parentHash: `0x${"ab".repeat(32)}` }));
-    await expect(run("0xb626", parent.context, parent.blocks, parent.receipts)).rejects.toThrow(
-      "CHUNK_PARENT_MISMATCH",
+    parent.blocks.set(
+      BLOCK + 1,
+      rehash({ ...b2, parentHash: `0x${"ab".repeat(32)}` }),
     );
+    await expect(
+      run("0xb626", parent.context, parent.blocks, parent.receipts),
+    ).rejects.toThrow("CHUNK_PARENT_MISMATCH");
 
     const end = twoBlockScenario();
     end.context.endHash = `0x${"cd".repeat(32)}`;
-    await expect(run("0xb626", end.context, end.blocks, end.receipts)).rejects.toThrow(
-      "CHUNK_END_HASH_MISMATCH",
-    );
+    await expect(
+      run("0xb626", end.context, end.blocks, end.receipts),
+    ).rejects.toThrow("CHUNK_END_HASH_MISMATCH");
   });
 
   it("rejects receipt index gaps, root mismatch, and header hash mismatch", async () => {
@@ -652,7 +734,10 @@ describe("captureChunkFrames", () => {
 
     const root = twoBlockScenario();
     const a = root.blocks.get(BLOCK)!;
-    root.blocks.set(BLOCK, rehash({ ...a, receiptsRoot: `0x${"ef".repeat(32)}` }));
+    root.blocks.set(
+      BLOCK,
+      rehash({ ...a, receiptsRoot: `0x${"ef".repeat(32)}` }),
+    );
     await expect(
       captureChunkFrames({
         rpc: captureRpc("0xb626", root.blocks, root.receipts),
@@ -687,5 +772,133 @@ describe("captureChunkFrames", () => {
     await expect(
       captureChunkFrames({ rpc, chainId: 46630, context }),
     ).rejects.toThrow("CHUNK_RECEIPTS_INVALID");
+  });
+});
+/**
+ * Task 11326 — the Rust guest and the TypeScript capture guard must accept exactly the same
+ * receipt envelope types. Each side used to pin only itself, so widening one left the other blind.
+ *
+ * The dangerous direction is Rust WIDER than TypeScript: capture refuses a receipt the guest would
+ * have accepted, so that receipt never enters a frame. Volume is dropped and the capture suite stays
+ * green. A green suite over an unmirrored list reads as coverage and is worse than a red one.
+ *
+ * The two sides spell legacy differently. The guest matches the legacy RLP list-header range
+ * 0xc0..=0xff and reports no envelope type; the capture guard models legacy as type 0. Both are
+ * folded onto a shared LEGACY marker before comparison, so the mirror is checked against meaning and
+ * not against spelling.
+ */
+const RECEIPT_RS_PATH = fileURLToPath(
+  new URL("../../../prover/volume-sp1/chunk/src/receipt.rs", import.meta.url),
+);
+const LEGACY = "LEGACY";
+
+/** Accepted envelope bytes taken from the guest's `match first` statement. */
+function rustEnvelopeArms(source: string): {
+  singles: number[];
+  ranges: [number, number][];
+} {
+  const start = source.indexOf("match first {");
+  if (start < 0) throw new Error("RECEIPT_RS_MATCH_NOT_FOUND");
+  const catchAll = source.indexOf("_ =>", start);
+  if (catchAll < 0) throw new Error("RECEIPT_RS_CATCHALL_NOT_FOUND");
+  const tokens =
+    source
+      .slice(start, catchAll)
+      .match(/0x[0-9a-fA-F]{2}(?:\.\.=0x[0-9a-fA-F]{2})?/g) ?? [];
+  const singles: number[] = [];
+  const ranges: [number, number][] = [];
+  for (const token of tokens) {
+    if (token.includes("..=")) {
+      const [lo, hi] = token.split("..=");
+      ranges.push([parseInt(lo, 16), parseInt(hi, 16)]);
+    } else {
+      singles.push(parseInt(token, 16));
+    }
+  }
+  return { singles, ranges };
+}
+
+/**
+ * Probe the real capture guard over every byte value. The accepted set is derived from behaviour, so
+ * the TypeScript side cannot drift away from this test without the test seeing it.
+ */
+function tsAcceptedReceiptTypes(): number[] {
+  const accepted: number[] = [];
+  for (let type = 0; type <= 0xff; type += 1) {
+    const probe = {
+      type,
+      status: 1,
+      cumulativeGasUsed: 21000n,
+      transactionIndex: 0,
+    } as IndexedBlockReceipt;
+    try {
+      validateGuestReceiptCompat(probe);
+      accepted.push(type);
+    } catch {
+      // Refused at this type; only the type dimension varies across probes.
+    }
+  }
+  return accepted;
+}
+
+function foldLegacy(types: Iterable<number>): Set<string> {
+  const out = new Set<string>();
+  for (const type of types) out.add(type === 0 ? LEGACY : String(type));
+  return out;
+}
+
+function formatSet(values: Set<string>): string {
+  return [...values]
+    .map((v) =>
+      v === LEGACY ? "legacy" : `0x${Number(v).toString(16).padStart(2, "0")}`,
+    )
+    .sort()
+    .join(", ");
+}
+
+describe("guest/capture receipt-type mirror (task 11326)", () => {
+  const rust = rustEnvelopeArms(readFileSync(RECEIPT_RS_PATH, "utf8"));
+  const tsTypes = tsAcceptedReceiptTypes();
+  const rustTyped = new Set(rust.singles.map(String));
+  const tsTyped = foldLegacy(tsTypes);
+  const rustFolded = new Set(rust.singles.map(String));
+  for (const [lo, hi] of rust.ranges) {
+    if (lo <= 0xc0 && hi >= 0xff) rustFolded.add(LEGACY);
+  }
+
+  it("parses the guest envelope match rather than asserting over nothing", () => {
+    expect(rust.singles.length).toBeGreaterThan(0);
+    expect(rust.ranges.length).toBe(1);
+  });
+
+  it("keeps the guest legacy arm exactly the RLP list-header range 0xc0..=0xff", () => {
+    expect(rust.ranges).toEqual([[0xc0, 0xff]]);
+  });
+
+  it("accepts the same receipt types in the guest and in capture, as sets", () => {
+    expect({ ...rustFolded }).toEqual({ ...tsTyped });
+  });
+
+  it("refuses the dangerous direction: no typed byte the guest accepts is missing from capture", () => {
+    const missingFromCapture = [...rustTyped].filter((v) => !tsTyped.has(v));
+    expect(missingFromCapture).toEqual([]);
+  });
+
+  it("refuses the mirror-image gap: no typed byte capture accepts is missing from the guest", () => {
+    const missingFromGuest = [...tsTyped].filter(
+      (v) => v !== LEGACY && !rustTyped.has(v),
+    );
+    expect(missingFromGuest).toEqual([]);
+  });
+
+  it("probes all 256 type values and accepts a strict subset", () => {
+    expect(tsTypes.length).toBeLessThan(256);
+    expect(tsTypes.length).toBeGreaterThan(0);
+  });
+
+  it("documents the legacy representation split that the fold depends on", () => {
+    expect(tsTypes).toContain(0);
+    expect(rust.singles).not.toContain(0);
+    expect(formatSet(rustFolded)).toBe(formatSet(tsTyped));
   });
 });
