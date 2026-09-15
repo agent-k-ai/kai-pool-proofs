@@ -108,7 +108,7 @@ systemd-run --user --wait --pipe --collect \
   --setenv="PATH=$PATH" bash scripts/sp1-build-source.sh
 ```
 
-The chunk is built from original commit `3cbabe7907c6b2ba3c498a54e2c977cbab2e17c1`;
+The chunk is built from re-frozen commit `00aba6b1646879fe6c6f485bb530437caeb22988`;
 its package version affects identity. The range uses the unchanged reviewed guest
 source/workspace release e. The host package has node release f. Rebuilding the
 chunk from the current workspace is not a substitute for its retained proven

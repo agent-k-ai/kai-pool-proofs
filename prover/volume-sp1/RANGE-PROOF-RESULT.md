@@ -70,7 +70,7 @@ the cryptographic evidence. The exact source interpretation is retained in
 ## Identities
 
 Base source: `408a65fa49db823e490d27b91feb4c687e185250`.
-Retained chunk guest source: `3cbabe7907c6b2ba3c498a54e2c977cbab2e17c1`.
+Retained chunk guest source: `00aba6b1646879fe6c6f485bb530437caeb22988`.
 The clean final local release-e commit/parent/branch are recorded in
 `SOURCE-COMMIT.json`, alongside the delivered patch and bundle. The pre-run
 source manifest hashes the exact 91 build-source/interface/fixture files, all
@@ -96,6 +96,31 @@ No source/manifest identity is inserted into its own guest build.
 | Source manifest SHA-256 | `0f2e8449d2c8dc693e4b0f3e51177acec37cda3a59ad26f5b64a2a1be72bca78` |
 | Producer executable SHA-256 | `557cd76261c947bb631863420c25d185e15ad9c3956a6307b35704613f578001` |
 | Retained runner SHA-256 | `99655ab85740820a1ab7bdc282b461ca23d8a27d1b53cb7c5e04074cea093b98` |
+
+### How the serialized VK SHA-256 rows are derived
+
+**The two "serialized VK" rows are not the SDK program VK and must not be confused
+with the `bytes32` rows above them.** Each is `SHA-256(bincode::serialize(vk))`,
+the hash of the bincode encoding of the verifying key, not a key identity.
+
+The derivation is repo-resident in the proof binaries:
+
+- `prover/volume-sp1/host/src/bin/volume-chunk-proof.rs:28-31` — `save_vk()`
+  runs `bincode::serialize(vk)`, writes the bytes to `program-vk.bin`, and
+  records `programVkBincodeSha256 = sha(&bytes)`.
+- `prover/volume-sp1/host/src/bin/volume-range-proof.rs:79-81` — `vk_meta()`
+  records the same quantity as `bincodeSha256`.
+
+**A reader can reproduce both rows by running either binary and hashing the
+emitted `program-vk.bin`.** `PROOF-COMMAND.md:61-63` states the distinction
+between the serialized VK hash and `programVkBytes32`.
+
+**Correction, 2026-09-15.** An earlier commit message on this branch cited
+`vkey-derive.rs:23,46` as the source of this derivation. That file was a
+scratch binary from the 2026-09-14 re-freeze run and was never committed; it is
+absent from every branch. **The citation was wrong and the derivation did not
+need it:** the repo's own proof binaries already compute and record this value,
+as cited above. The values in the table are unaffected.
 
 Range VK raw `hash_u32()` words:
 `[2094254705, 898802103, 345077453, 1669037800, 961172477, 815790002, 2007726622, 1106690058]`. Its `hash_bytes()` is

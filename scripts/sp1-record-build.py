@@ -8,6 +8,19 @@ def pin(p):
         for b in iter(lambda:f.read(1024*1024),b''):h.update(b)
     return {'path':str(p),'sha256':h.hexdigest()}
 ref=json.loads((repo/'prover/volume-sp1/NODE-BUILD-REFERENCE.json').read_text())
+# Source provenance is checked first. It is the cheapest check and it gives the best
+# diagnostic. The provenance files are written at archive time, so they exist before
+# any compile. If the archive used the wrong commit, the operator gets the precise
+# mismatch text instead of the ELF loop's vague "revalidate source/build".
+def archived(role):
+    f=build/'provenance'/('archived-%s-commit.txt'%role)
+    if not f.exists():raise SystemExit('SP1_%s_SOURCE_PROVENANCE_MISSING: %s'%(role.upper(),f))
+    return f.read_text().strip()
+archived_chunk=archived('chunk');archived_range=archived('range')
+if archived_chunk!=ref['chunkElf']['sourceCommit']:
+    raise SystemExit('SP1_CHUNK_SOURCE_MISMATCH: archived %s but reference pins %s; never relabel old provenance'%(archived_chunk,ref['chunkElf']['sourceCommit']))
+if archived_range!=ref['rangeElf']['sourceCommit']:
+    raise SystemExit('SP1_RANGE_SOURCE_MISMATCH: archived %s but reference pins %s; never relabel old provenance'%(archived_range,ref['rangeElf']['sourceCommit']))
 files={}
 for role,target,name in [('chunkElf','chunk-target','volume-chunk-guest'),('rangeElf','range-target','volume-range-guest')]:
     p=build/target/'elf-compilation/riscv64im-succinct-zkvm-elf/release'/name
@@ -19,6 +32,6 @@ paths=subprocess.check_output(['git','-C',str(repo),'ls-files','-z']).decode().s
 source={'kind':'volume-sp1-source-manifest/v1','sourceCommit':commit,'files':{p:pin(repo/p)['sha256'] for p in paths if p}}
 source_file=build/'provenance/source-manifest.json';source_file.write_text(json.dumps(source,sort_keys=True,indent=2)+'\n')
 files['sourceManifest']=pin(source_file)
-record={'sourceCommit':commit,'chunkSourceCommit':ref['chunkElf']['sourceCommit'],'rangeSourceCommit':ref['rangeElf']['sourceCommit'],**files,'proofGenerated':False}
+record={'sourceCommit':commit,'chunkSourceCommit':archived_chunk,'rangeSourceCommit':archived_range,**files,'proofGenerated':False}
 (build/'provenance/build-files.json').write_text(json.dumps(record,indent=2)+'\n')
 print(json.dumps(record,indent=2))

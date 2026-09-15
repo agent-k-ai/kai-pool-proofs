@@ -18,8 +18,18 @@ fi
 mkdir "$SP1_NODE_BUILD_DIR"
 build=$(cd "$SP1_NODE_BUILD_DIR" && pwd)
 mkdir "$build/chunk-source" "$build/range-source" "$build/provenance"
-git -C "$repo" archive 3cbabe7907c6b2ba3c498a54e2c977cbab2e17c1 prover/volume-sp1 | tar -xf - --strip-components=2 -C "$build/chunk-source"
-git -C "$repo" archive HEAD prover/volume-sp1 | tar -xf - --strip-components=2 -C "$build/range-source"
+# One variable drives both the archive and the recorded provenance per side.
+# The recorded value is rev-parse of the same variable that was archived, so the
+# record cannot claim a commit the archive did not use. Values are checked against
+# prover/volume-sp1/NODE-BUILD-REFERENCE.json by scripts/sp1-record-build.py.
+CHUNK_SOURCE_COMMIT=00aba6b1646879fe6c6f485bb530437caeb22988
+# Range source is pinned to the reviewed release, the same way as chunk. HEAD is a
+# mutable ref and this script's own contract forbids building from mutable inputs.
+RANGE_SOURCE_COMMIT=9a12b81f3587ccc4e903593fbd52c5ebeb7349eb
+git -C "$repo" archive "$CHUNK_SOURCE_COMMIT" prover/volume-sp1 | tar -xf - --strip-components=2 -C "$build/chunk-source"
+git -C "$repo" archive "$RANGE_SOURCE_COMMIT" prover/volume-sp1 | tar -xf - --strip-components=2 -C "$build/range-source"
+git -C "$repo" rev-parse "$CHUNK_SOURCE_COMMIT" > "$build/provenance/archived-chunk-commit.txt"
+git -C "$repo" rev-parse "$RANGE_SOURCE_COMMIT" > "$build/provenance/archived-range-commit.txt"
 export CARGO_NET_OFFLINE=true RUSTUP_AUTO_INSTALL=0 GOPROXY=off GOTOOLCHAIN=local GOFLAGS=-mod=readonly
 export CARGO_BUILD_JOBS="$SP1_NODE_BUILD_JOBS" GOMAXPROCS="$SP1_NODE_BUILD_JOBS"
 (
