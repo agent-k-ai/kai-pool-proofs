@@ -15,7 +15,7 @@ This package checks bytes and computes values. It does not attest canonicality, 
 - `journal_domain()`: Keccak256 of `KAI_VOLUME_SP1_RANGE_V1`. Other terms identity/policy hashes are explicit caller inputs, never guessed defaults.
 
 A journal may describe a nonempty subrange inside the terms. Full-window enforcement and cryptographic authentication belong to the guest/receiver owner.
-Terms validation checks widths,3–8 arity, duplicates/padding, V4 kind1, static fee, pool-key hash, quote normalization and timing consistency.
+Terms validation checks widths,3–8 arity, duplicates/padding, venue kind1 (Uniswap V4 pool) or kind2 (Uniswap V3 pool), static fee, the pool identity per kind (kind1: pool-key hash; kind2: the pinned pool address as a word), an all-or-nothing hook pin (a hook with its code hash, or both zero), one kind per emitter address, a nonzero terms-carried chain id with the Nitro header profile, quote normalization and timing consistency.
 It does not read code, verify liquidity/admission, choose fee/rate policy, or establish that caller-supplied terms are authorized.
 
 ## Header handoff to trie owner
@@ -48,13 +48,13 @@ totals.record(log)?;
 let (volumes, counts) = totals.into_totals();
 ```
 
-`None` means irrelevant, below-floor, or (for the accumulator) uncovered work. Malformed relevant V4 logs return an error.
-Unknown activated venue kinds are rejected before processing. Kind1/V3 kind2 come from the recorded activity contract, not CLI guesses.
-V4 token-positive means output/buy; token-negative means sell. Both directions contribute absolute quote delta when `quote >= minNotional`.
+`None` means irrelevant, below-floor, or (for the accumulator) uncovered work. Malformed relevant V4 or V3 logs return an error.
+`qualify` dispatches on the kind of the venue the emitter pins: kind1 → `qualify_v4` (PoolManager `Swap`, venue by pool id in topic1), kind2 → `qualify_v3` (the pinned pool's own `Swap(address,address,int256,int256,uint160,uint128,int24)`, three topics, 160-byte data, venue by emitter). Unknown kinds are rejected at validation, before processing.
+V4 deltas belong to the swapper: token-positive means output/buy. V3 deltas belong to the pool: token-negative means output/buy. `token_is_output` carries that normalized meaning; amounts stay as emitted (`I256`). Both directions contribute absolute quote delta when `quote >= minNotional`.
 Zero stays in the raw PoolKey; only the explicitly supplied wrapper represents native quote accounting.
 The decoder additionally rejects noncanonical sender/auxiliary ABI padding, which legacy casts/partial decoding may not check.
 
-`accumulate_checked(&mut volume,&mut count,quote)` updates both or neither on overflow. `i128::MIN` has magnitude2^127, without signed abs overflow.
+`accumulate_checked(&mut volume,&mut count,quote)` updates both or neither on overflow. `i128::MIN` has magnitude2^127 and `int256::MIN` has magnitude2^255, without signed abs overflow; the per-window bound is the uint256 sum of those magnitudes, refused on overflow.
 There are no swap/receipt limits or reward calculations. An accumulator contains arithmetic totals, not proven coverage.
 
 ## Integration boundary

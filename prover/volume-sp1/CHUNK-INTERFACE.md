@@ -115,7 +115,9 @@ the externally anchored canonical chain authenticates those committed bytes.
 One complete block corpus is borrowed from its input frame. Logs are iterated without
 allocating a decoded log list. There is no application receipt/log/swap cap. Counts
 and framing lengths have uint64 representation limits; overflow fails the chunk.
-Per-swap V4 magnitude is at most 2^127 and all aggregate arithmetic is checked.
+Per-swap magnitude is at most 2^127 (V4, int128) or 2^255 (V3, int256); the per-window
+bound is the uint256 sum of magnitudes and all aggregate arithmetic is checked (overflow
+fails the chunk).
 Diagnostic counts also fail on uint64 overflow; they never silently truncate work.
 
 This is **not** an oversized-block streaming implementation. The complete node corpus
