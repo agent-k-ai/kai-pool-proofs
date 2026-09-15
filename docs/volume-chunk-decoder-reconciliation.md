@@ -1,9 +1,9 @@
 # Volume chunk decoder reconciliation
 
 Scope: the standalone Rust receipt decoder delivered on
-`feat/volume-receipt-decoded-20260912` (crate `receipt-decoded`, head
+`feat/volume-receipt-decoded-20260912` (crate `receipt-decoded`, at revision
 `62f7b15`) versus the integrated SP1 chunk adapter
-(`prover/volume-sp1/chunk/src/receipt.rs`, head `3cbabe7`, imported into
+(`prover/volume-sp1/chunk/src/receipt.rs`, at revision `3cbabe7`, pre-re-freeze, imported into
 this repository under `prover/`). Also covers the TypeScript capture
 path in `packages/volume-proof/src/chunk-frame.ts`.
 
@@ -21,7 +21,7 @@ is documented here instead of being hidden.
 
 ## Field-by-field comparison
 
-| Field | `receipt-decoded` (62f7b15) | chunk adapter (3cbabe7) | capture path (TS) |
+| Field | `receipt-decoded` (rev 62f7b15) | chunk adapter (rev 3cbabe7, pre-re-freeze) | capture path (TS) |
 |---|---|---|---|
 | Envelope | legacy `0xc0..=0xff`; any typed leading byte `<= 0x7f` | legacy `0xc0..=0xff`; typed `0x01`, `0x02`, `0x6a` only | adapter rules enforced |
 | Arity | exactly 4 fields, trailing rejected | exactly 4 fields, trailing rejected | adapter rules enforced |
@@ -80,7 +80,9 @@ decide what the guest will accept.
 
 ## Sources
 
-- `prover/volume-sp1/chunk/src/receipt.rs` at `3cbabe7` (imported).
+- `prover/volume-sp1/chunk/src/receipt.rs` at revision `3cbabe7` (imported,
+  pre-re-freeze). The chunk adapter was later re-frozen to `00aba6b1646879fe6c6f485bb530437caeb22988`; this comparison
+  was not re-run against that revision.
 - `experiments/complete-race-proof/receipt` at `62f7b15`
   (`feat/volume-receipt-decoded-20260912`).
 - `packages/volume-proof/src/chunk-frame.ts` (this branch).

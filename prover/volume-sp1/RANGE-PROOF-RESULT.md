@@ -70,7 +70,7 @@ the cryptographic evidence. The exact source interpretation is retained in
 ## Identities
 
 Base source: `408a65fa49db823e490d27b91feb4c687e185250`.
-Retained chunk guest source: `3cbabe7907c6b2ba3c498a54e2c977cbab2e17c1`.
+Retained chunk guest source: `00aba6b1646879fe6c6f485bb530437caeb22988`.
 The clean final local release-e commit/parent/branch are recorded in
 `SOURCE-COMMIT.json`, alongside the delivered patch and bundle. The pre-run
 source manifest hashes the exact 91 build-source/interface/fixture files, all

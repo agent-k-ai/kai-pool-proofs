@@ -2,7 +2,7 @@
 
 `volume-chunk-proof` proves the retained block 117903561 diagnostic input using
 SP1 SDK 6.7.0, circuit v6.1.0, and the existing guest ELF from source
-`3cbabe7907c6b2ba3c498a54e2c977cbab2e17c1`. The ELF SHA-256 is enforced by
+`00aba6b1646879fe6c6f485bb530437caeb22988`. The ELF SHA-256 is enforced by
 the command. The receipt data is real; terms, entrant identities, timing,
 admission and financial context remain synthetic.
 

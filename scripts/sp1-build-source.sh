@@ -18,7 +18,7 @@ fi
 mkdir "$SP1_NODE_BUILD_DIR"
 build=$(cd "$SP1_NODE_BUILD_DIR" && pwd)
 mkdir "$build/chunk-source" "$build/range-source" "$build/provenance"
-git -C "$repo" archive 3cbabe7907c6b2ba3c498a54e2c977cbab2e17c1 prover/volume-sp1 | tar -xf - --strip-components=2 -C "$build/chunk-source"
+git -C "$repo" archive 00aba6b1646879fe6c6f485bb530437caeb22988 prover/volume-sp1 | tar -xf - --strip-components=2 -C "$build/chunk-source"
 git -C "$repo" archive HEAD prover/volume-sp1 | tar -xf - --strip-components=2 -C "$build/range-source"
 export CARGO_NET_OFFLINE=true RUSTUP_AUTO_INSTALL=0 GOPROXY=off GOTOOLCHAIN=local GOFLAGS=-mod=readonly
 export CARGO_BUILD_JOBS="$SP1_NODE_BUILD_JOBS" GOMAXPROCS="$SP1_NODE_BUILD_JOBS"
