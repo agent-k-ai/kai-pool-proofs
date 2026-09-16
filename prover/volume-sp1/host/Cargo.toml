@@ -14,7 +14,7 @@ path = "src/bin/volume-range-groth16.rs"
 required-features = ["groth16-native"]
 
 [dependencies]
-sp1-sdk = { version = "=6.7.0", default-features = false }
+sp1-sdk = { version = "=6.7.0", default-features = false, features = ["cuda"] }
 kai-volume-chunk = { path = "../chunk" }
 kai-volume-core = { path = "../core" }
 kai-volume-range = { path = "../range" }

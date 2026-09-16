@@ -552,7 +552,10 @@ async fn run(a: &[String]) -> Result<()> {
             return Ok(());
         }
         let t = Instant::now();
-        let cpu = ProverClient::builder().cpu().build().await;
+        let cpu: sp1_sdk::env::EnvProver = match std::env::var("PROVER_BACKEND").as_deref() {
+            Ok("cuda") => sp1_sdk::env::EnvProver::Cuda(ProverClient::builder().cuda().build().await),
+            _ => sp1_sdk::env::EnvProver::Cpu(ProverClient::builder().cpu().build().await),
+        };
         let pk = cpu.setup(Elf::from(plan.elf(r).to_vec())).await?;
         if bincode::serialize(pk.verifying_key())? != bincode::serialize(plan.vk(r))? {
             return Err("CPU/Light fresh VK mismatch".into());

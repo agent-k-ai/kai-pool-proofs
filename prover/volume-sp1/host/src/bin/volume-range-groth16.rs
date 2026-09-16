@@ -208,7 +208,10 @@ async fn main() -> Result<()> {
         m["children"] = json!(children);
         fs::write(out.join("stdin.bin"), raw)?;
         let t = Instant::now();
-        let cpu = ProverClient::builder().cpu().build().await;
+        let cpu: sp1_sdk::env::EnvProver = match std::env::var("PROVER_BACKEND").as_deref() {
+            Ok("cuda") => sp1_sdk::env::EnvProver::Cuda(ProverClient::builder().cuda().build().await),
+            _ => sp1_sdk::env::EnvProver::Cpu(ProverClient::builder().cpu().build().await),
+        };
         let pk = cpu.setup(Elf::from(data[1].clone())).await?;
         if bincode::serialize(pk.verifying_key())? != bincode::serialize(rvk)? {
             return Err("CPU/Light VK mismatch".into());
