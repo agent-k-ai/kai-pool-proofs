@@ -13,11 +13,18 @@ use sp1_sdk::{
     Elf, HashableKey, ProveRequest, Prover, ProverClient, ProvingKey, RiscvAir, SP1Proof,
     SP1ProofWithPublicValues, SP1PublicValues, SP1Stdin, StatusCode, SP1_CIRCUIT_VERSION,
 };
-use std::{error::Error, fs, io::Read, path::Path, time::Instant};
+use std::{error::Error, fs, path::Path, time::Instant};
 
 #[path = "../prover_backend.rs"]
 mod prover_backend;
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
+#[path = "../plan.rs"]
+#[allow(dead_code)]
+mod plan;
+#[path = "../batch.rs"]
+#[allow(dead_code)]
+mod batch;
+use plan::cache_gate;
 // SDK 6.7.0 embeds the runner override at BUILD time. A runtime environment
 // variable cannot relocate it. Refuse a different path instead of silently
 // executing an unpinned helper; public users build with their own pinned path.
@@ -37,72 +44,15 @@ fn save(out: &Path, m: &Value) -> Result<()> {
     fs::write(out.join("metrics.json"), serde_json::to_vec_pretty(m)?)?;
     Ok(())
 }
-fn cache_gate(manifest: &[u8]) -> Result<Value> {
-    let manifest: Value = serde_json::from_slice(manifest)?;
-    let base = std::env::var("SP1_GROTH16_CIRCUIT_PATH")?;
-    let dir = Path::new(&base).join("v6.1.0");
-    if sp1_prover::build::groth16_circuit_artifacts_dir()? != dir
-        || !dir.join(".complete").is_file()
-    {
-        return Err("existing complete v6.1.0 cache required; no install/download allowed".into());
-    }
-    let approved = [
-        (
-            "groth16_vk.bin",
-            "4388a21c687fdd5f218d7e3d13190cac4c5355818d3605fd5fb811df468ee696",
-        ),
-        (
-            "groth16_pk.bin",
-            "c3760e0e3b58487f8704680d5b3ad32a9fbca9f3cb0749d69055c4f1271ca167",
-        ),
-        (
-            "groth16_circuit.bin",
-            "d6a66be2702206e2b1a20bebf7096142864feac9e399a309e5e6e00353264cbc",
-        ),
-    ];
-    let files = manifest["files"]
-        .as_array()
-        .ok_or("parameter manifest files")?;
-    for (name, digest) in approved {
-        if !files
-            .iter()
-            .any(|f| f["file"] == name && f["sha256"] == digest)
-        {
-            return Err("manifest lacks approved parameter identity".into());
-        }
-    }
-    let mut records = Vec::new();
-    let mut names = std::collections::BTreeSet::new();
-    for f in files {
-        let name = f["file"].as_str().ok_or("parameter filename")?;
-        if Path::new(name).components().count() != 1 || name == ".." || !names.insert(name) {
-            return Err("parameter path/duplicate".into());
-        }
-        let mut file = fs::File::open(dir.join(name))?;
-        let size = file.metadata()?.len();
-        let mut h = Sha256::new();
-        let mut b = [0u8; 1024 * 1024];
-        loop {
-            let n = file.read(&mut b)?;
-            if n == 0 {
-                break;
-            }
-            h.update(&b[..n]);
-        }
-        let digest = hex::encode(h.finalize());
-        if f["bytes"].as_u64() != Some(size) || f["sha256"].as_str() != Some(digest.as_str()) {
-            return Err(format!("parameter integrity mismatch: {name}").into());
-        }
-        records.push(json!({"file":name,"bytes":size,"sha256":digest}));
-    }
-    Ok(json!({"verifiedFiles":records,"downloads":false,"ceremonyRegenerated":false}))
-}
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<()> {
     // An unknown PROVER_BACKEND must fail here, before any output or proving work.
     prover_backend::backend()?;
     runner_binding()?;
     let a: Vec<_> = std::env::args().collect();
+    if a.get(1).map(String::as_str) == Some("serve") {
+        return batch::serve(&a).await;
+    }
     if a.len() < 8
         || !matches!(a[1].as_str(), "prove" | "verify")
         || (a[1] == "verify" && a.len() != 8)

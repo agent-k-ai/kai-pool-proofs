@@ -67,3 +67,48 @@ provenance only; it is not independently authenticated or a public proof input.
 This command establishes a positive diagnostic chunk proof only. It does not
 implement recursive child-status design, range/full-race acceptance, canonical
 chain admission, EVM/Groth16 verification, funding, deployment or publication.
+
+## Persistent batch mode
+
+`volume-range-proof serve --jobs LIST.json` (and the same subcommand in
+`volume-range-groth16`) initialises the plan, the prover and both program keys
+once, then runs every job in the list in order: chunk proofs, range merges and
+the Groth16 root. Per-job artifacts keep the per-job names, formats and metric
+keys (`proof.bin`, `public-values.bin`, `native-journal.bin`, `stdin.bin`,
+`metrics.json`), so `assemble` and `verify` tooling is unchanged. A job whose
+`proof.bin` already exists is loaded, SDK-verified against the frozen statement
+and skipped, so a crashed batch resumes and never overwrites retained artifacts.
+
+Paths in the list resolve against the directory of the list file.
+
+```json
+{
+  "kind": "kai-volume-range-batch/v1",
+  "plan": "plan/new-plan",
+  "jobs": [
+    {"id": "chunk-0", "form": "compressed", "role": "chunk",
+     "frames": "frames/chunk-00.frames", "out": "out/chunk-0"},
+    {"id": "range-L1-0", "form": "compressed", "role": "range",
+     "frames": "range/range-L1-0.frames", "out": "out/range-L1-0",
+     "children": [["chunk", "out/chunk-0/proof.bin"], ["chunk", "out/chunk-1/proof.bin"]]},
+    {"id": "root", "form": "groth16", "frames": "range/root.frames", "out": "out/root",
+     "children": [["range", "out/range-L5-0/proof.bin"], ["range", "out/range-L1-16/proof.bin"]],
+     "parameterManifest": "params/PARAMETER-MANIFEST.json"}
+  ]
+}
+```
+
+`form` defaults to `compressed`. A compressed job needs `role` (chunk or range).
+A range or Groth16 job with `children` builds its frame file from those child
+proofs when the file is missing, byte-identical to the `assemble` phase.
+`sourceManifest` defaults to `<plan>/source-manifest.json`. The Groth16 root in
+the same process needs a binary built with `--features groth16-native`; the plain
+build rejects a `groth16` job with a clear error.
+
+Per-job `metrics.json` keeps every per-job key and adds a `batch` object with
+`jobId`, `jobIndex`, `form`, `planLoadSeconds`, `proverInitSeconds`,
+`oneTimeSetupSeconds`, `keySetupSecondsByRole` and `resumed`. `setupSeconds` is
+the key setup that this job paid for, and it is 0 when the key was reused.
+The command prints one batch summary as JSON: `jobCount`, `backend`, the
+per-job records, the one-time setup seconds, the per-role key setup seconds and
+`batchWallSeconds`.

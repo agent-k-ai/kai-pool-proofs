@@ -2,251 +2,30 @@
 //! Honest CPU producer. Plans bind concrete ELF/VK/suite/terms; native evaluation is not proof evidence.
 use kai_volume_chunk::{
     evaluate_frames as chunk_eval,
-    framing::{decode_block, read_frame, write_frame, Context},
+    framing::{decode_block, Context},
 };
-use kai_volume_core::{keccak256, parse_nitro_header, VolumeJournalV1, VolumeTermsV1};
-use kai_volume_range::{
-    framing::{evaluate_frames as range_eval, Request},
-    key::{decode_hash_bytes, pack31},
-    suite::{suite_domain, Role, VolumeProofSuiteV1, CIRCUIT_IDENTITY},
-};
-use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
+use kai_volume_core::{keccak256, parse_nitro_header, VolumeTermsV1};
+use kai_volume_range::suite::{suite_domain, Role, VolumeProofSuiteV1, CIRCUIT_IDENTITY};
+use serde_json::json;
 use sp1_sdk::{
-    light::LightProver, Elf, HashableKey, ProveRequest, Prover, ProverClient, ProvingKey, RiscvAir,
-    SP1Proof, SP1ProofWithPublicValues, SP1PublicValues, SP1Stdin, SP1VerifyingKey, StatusCode,
-    SP1_CIRCUIT_VERSION,
+    Elf, ProveRequest, Prover, ProverClient, ProvingKey, SP1Proof, SP1ProofWithPublicValues,
+    SP1PublicValues, StatusCode,
 };
 use std::{error::Error, fs, path::Path, time::Instant};
 
 #[path = "../prover_backend.rs"]
 mod prover_backend;
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-const CHUNK_ELF_SHA256: &str = "65f03aa5cb1a26e6640f4a100174e721020b13450a7ffe201c8fa3d3d5ed6fbd";
-// SDK 6.7.0 embeds the runner override at BUILD time. A runtime environment
-// variable cannot relocate it. Refuse a different path instead of silently
-// executing an unpinned helper; public users build with their own pinned path.
-fn runner_binding() -> Result<()> {
-    let compiled = option_env!("SP1_CORE_RUNNER_OVERRIDE_BINARY")
-        .ok_or("build host with an explicit pinned external runner")?;
-    let selected = std::env::var("SP1_CORE_RUNNER_OVERRIDE_BINARY")?;
-    if fs::canonicalize(compiled)? != fs::canonicalize(selected)? {
-        return Err("runtime runner differs from SDK build-time binding; rebuild host at your own pinned path".into());
-    }
-    Ok(())
-}
-fn sha(b: &[u8]) -> String {
-    hex::encode(Sha256::digest(b))
-}
-fn role(s: &str) -> Result<Role> {
-    match s {
-        "chunk" => Ok(Role::Chunk),
-        "range" => Ok(Role::Range),
-        _ => Err("role must be chunk or range".into()),
-    }
-}
-fn role_name(r: Role) -> &'static str {
-    match r {
-        Role::Chunk => "chunk",
-        Role::Range => "range",
-    }
-}
-fn record(out: &Path, name: &str, v: &Value) -> Result<()> {
-    fs::write(out.join(name), serde_json::to_vec_pretty(v)?)?;
-    Ok(())
-}
-fn frames(b: &[u8]) -> Result<Vec<Vec<u8>>> {
-    let mut c = b;
-    let mut f = Vec::new();
-    while let Some(v) = read_frame(&mut c)? {
-        f.push(v);
-    }
-    Ok(f)
-}
-fn file_frames(f: &[Vec<u8>]) -> Result<Vec<u8>> {
-    let mut b = Vec::new();
-    for v in f {
-        write_frame(&mut b, v)?;
-    }
-    Ok(b)
-}
-fn vk_bytes32(vk: &SP1VerifyingKey) -> Result<[u8; 32]> {
-    let bytes: [u8; 32] = hex::decode(vk.bytes32().trim_start_matches("0x"))?
-        .try_into()
-        .map_err(|_| "SDK VK width")?;
-    if pack31(&vk.hash_u32())? != bytes || decode_hash_bytes(&vk.hash_bytes())? != vk.hash_u32() {
-        return Err("SDK/canonical key conversion mismatch".into());
-    }
-    Ok(bytes)
-}
-fn vk_meta(vk: &SP1VerifyingKey) -> Result<Value> {
-    Ok(
-        json!({"bytes32":vk.bytes32(),"hashU32":vk.hash_u32(),"hashBytes":hex::encode(vk.hash_bytes()),"bincodeSha256":sha(&bincode::serialize(vk)?)}),
-    )
-}
-fn safety() -> Result<Value> {
-    if SP1_CIRCUIT_VERSION.trim() != "v6.1.0" {
-        return Err("circuit version".into());
-    }
-    if std::env::var("WITHOUT_VK_VERIFICATION").is_ok_and(|v| v != "false") {
-        return Err("recursion VK verification disabled".into());
-    }
-    let config = sp1_prover::worker::SP1WorkerConfig::new(RiscvAir::machine());
-    let c = &config.prover_config.core_prover_config;
-    let r = &config.prover_config.recursion_prover_config;
-    if !c.verify_intermediates || !r.verify_intermediates {
-        return Err("intermediate verification disabled".into());
-    }
-    Ok(
-        json!({"coreVerifyIntermediates":c.verify_intermediates,"recursionVerifyIntermediates":r.verify_intermediates,
-        "coreWorkers":c.num_core_workers,"coreBuffer":c.core_buffer_size,"setupWorkers":c.num_setup_workers,"setupBuffer":c.setup_buffer_size,
-        "recursionExecutorWorkers":r.num_recursion_executor_workers,"recursionProverWorkers":r.num_recursion_prover_workers,
-        "prepareReduceWorkers":r.num_prepare_reduce_workers,"recursionVkVerification":true}),
-    )
-}
-struct Plan {
-    light: LightProver,
-    terms: VolumeTermsV1,
-    suite: VolumeProofSuiteV1,
-    chunk_elf: Vec<u8>,
-    range_elf: Vec<u8>,
-    chunk_vk: SP1VerifyingKey,
-    range_vk: SP1VerifyingKey,
-    manifest_sha: String,
-    source_sha: String,
-    context_origin: String,
-}
-impl Plan {
-    fn vk(&self, r: Role) -> &SP1VerifyingKey {
-        match r {
-            Role::Chunk => &self.chunk_vk,
-            Role::Range => &self.range_vk,
-        }
-    }
-    fn elf(&self, r: Role) -> &[u8] {
-        match r {
-            Role::Chunk => &self.chunk_elf,
-            Role::Range => &self.range_elf,
-        }
-    }
-    async fn load(path: &Path) -> Result<Self> {
-        let raw = fs::read(path.join("plan.json"))?;
-        let m: Value = serde_json::from_slice(&raw)?;
-        let mut data = Vec::new();
-        for name in [
-            "chunk.elf",
-            "range.elf",
-            "terms.abi",
-            "suite.abi",
-            "source-manifest.json",
-        ] {
-            let b = fs::read(path.join(name))?;
-            if m["files"][name]["sha256"].as_str() != Some(sha(&b).as_str()) {
-                return Err(format!("frozen plan hash mismatch: {name}").into());
-            }
-            data.push(b);
-        }
-        if sha(&data[0]) != CHUNK_ELF_SHA256 {
-            return Err("retained chunk ELF mismatch".into());
-        }
-        let terms = VolumeTermsV1::abi_decode(&data[2])?;
-        let suite = VolumeProofSuiteV1::abi_decode(&data[3])?;
-        suite.validate_terms(&terms)?;
-        let light = ProverClient::builder().light().build().await;
-        let chunk_pk = light.setup(Elf::from(data[0].clone())).await?;
-        let range_pk = light.setup(Elf::from(data[1].clone())).await?;
-        let chunk_vk = chunk_pk.verifying_key().clone();
-        let range_vk = range_pk.verifying_key().clone();
-        for (role, vk) in [(Role::Chunk, &chunk_vk), (Role::Range, &range_vk)] {
-            if vk_bytes32(vk)? != suite.role_key(role) {
-                return Err("fresh ELF-derived VK does not match suite".into());
-            }
-            if bincode::serialize(vk)?
-                != fs::read(path.join(format!("{}-vk.bin", role_name(role))))?
-            {
-                return Err("fresh VK differs from frozen VK".into());
-            }
-        }
-        Ok(Self {
-            light,
-            terms,
-            suite,
-            chunk_elf: data[0].clone(),
-            range_elf: data[1].clone(),
-            chunk_vk,
-            range_vk,
-            manifest_sha: sha(&raw),
-            source_sha: sha(&data[4]),
-            context_origin: m["contextOrigin"]
-                .as_str()
-                .unwrap_or("diagnostic-synthetic")
-                .to_owned(),
-        })
-    }
-    fn expected(&self, r: Role, f: &[Vec<u8>]) -> Result<[u8; 800]> {
-        let first = f.first().ok_or("empty input")?;
-        let mut it = f.iter().cloned();
-        match r {
-            Role::Chunk => {
-                let c = Context::decode(first)?;
-                if c.terms != self.terms {
-                    return Err("chunk terms differ from frozen plan".into());
-                }
-                Ok(chunk_eval(|| Ok(it.next()))?.journal)
-            }
-            Role::Range => {
-                let c = Request::decode(first)?;
-                if c.terms != self.terms || c.suite != self.suite {
-                    return Err("range terms/suite differ from frozen plan".into());
-                }
-                Ok(range_eval(|| Ok(it.next()))?.journal)
-            }
-        }
-    }
-    fn load_child(&self, r: Role, path: &str) -> Result<SP1ProofWithPublicValues> {
-        let p = SP1ProofWithPublicValues::load(path)?;
-        if !matches!(p.proof, SP1Proof::Compressed(_)) {
-            return Err("child must be genuine compressed proof".into());
-        }
-        self.light
-            .verify(&p, self.vk(r), Some(StatusCode::SUCCESS))?;
-        VolumeJournalV1::abi_decode(p.public_values.as_slice(), &self.terms)?;
-        Ok(p)
-    }
-    fn stdin(&self, r: Role, f: &[Vec<u8>], paths: &[String]) -> Result<(SP1Stdin, Value)> {
-        let mut stdin = SP1Stdin::new();
-        for v in f {
-            stdin.write_slice(v);
-        }
-        let mut child_records = Vec::new();
-        if r == Role::Chunk {
-            if !paths.is_empty() {
-                return Err("chunk has no child proof stream".into());
-            }
-        } else {
-            let mut it = f.iter().cloned();
-            let pending = range_eval(|| Ok(it.next()))?;
-            if paths.len() != pending.children.len() {
-                return Err("child proof stream arity mismatch".into());
-            }
-            for (child, path) in pending.children.iter().zip(paths) {
-                let proof = self.load_child(child.role, path)?;
-                if proof.public_values.as_slice() != child.journal
-                    || self.vk(child.role).hash_u32() != child.vk_words
-                {
-                    return Err("child proof/context or key mismatch".into());
-                }
-                child_records.push(json!({"role":role_name(child.role),"proofBundleSha256":sha(&fs::read(path)?),"journalSha256":hex::encode(child.journal_sha256),"vk":vk_meta(self.vk(child.role))?,"sdkExplicitSuccess":"Ok(())"}));
-                let SP1Proof::Compressed(p) = proof.proof else {
-                    unreachable!()
-                };
-                stdin.write_proof(*p, self.vk(child.role).vk.clone());
-            }
-        }
-        Ok((stdin, json!(child_records)))
-    }
-}
-
+#[path = "../plan.rs"]
+#[allow(dead_code)]
+mod plan;
+#[path = "../batch.rs"]
+#[allow(dead_code)]
+mod batch;
+use plan::{
+    file_frames, frames, record, role, role_name, runner_binding, safety, sha, vk_bytes32, vk_meta,
+    Plan, CHUNK_ELF_SHA256,
+};
 /// Freeze supplied bytes without manufacturing a suite or changing any race terms.
 /// On-chain approval/canonicality is checked separately by the public node.
 async fn freeze_context(a: &[String]) -> Result<()> {
@@ -405,44 +184,19 @@ async fn assemble(a: &[String]) -> Result<()> {
     }
     let plan = Plan::load(Path::new(&a[2])).await?;
     let mut children = Vec::new();
-    let mut f = Vec::new();
-    let mut identities = Vec::new();
     for pair in a[4..].chunks_exact(2) {
-        let role = role(&pair[0])?;
-        let p = plan.load_child(role, &pair[1])?;
-        children.push(VolumeJournalV1::abi_decode(
-            p.public_values.as_slice(),
-            &plan.terms,
-        )?);
-        f.extend([
-            vec![role as u8],
-            plan.vk(role).hash_bytes().to_vec(),
-            p.public_values.to_vec(),
-        ]);
-        identities.push(json!({"role":role_name(role),"proofSha256":sha(&fs::read(&pair[1])?)}));
+        children.push((plan::role(&pair[0])?, pair[1].clone()));
     }
-    let mut output = children[0].clone();
-    let last = children.last().unwrap();
-    output.to_inclusive = last.to_inclusive;
-    output.end_hash = last.end_hash;
-    output.volume_quote = Default::default();
-    output.qualifying_swap_count = Default::default();
-    let req = Request {
-        terms: plan.terms.clone(),
-        suite: plan.suite.clone(),
-        child_count: children.len() as u8,
-        output_context: output,
-    };
-    f.insert(0, req.encode()?);
-    let expected = plan.expected(Role::Range, &f)?;
+    let (input, identities) = plan::assemble_frames(&plan, &children)?;
     let out = Path::new(&a[3]);
-    let input = file_frames(&f)?;
+    // A new frame file only: the per-job phase never overwrites retained frames.
     let mut file = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(out)?;
     use std::io::Write;
     file.write_all(&input)?;
+    let expected = plan.expected(Role::Range, &plan::frames(&input)?)?;
     fs::write(out.with_extension("journal"), expected)?;
     fs::write(
         out.with_extension("children.json"),
@@ -615,6 +369,7 @@ async fn main() -> Result<()> {
         Some("freeze-context") => freeze_context(&a).await,
         Some("freeze-diagnostic") => freeze_diagnostic(&a).await,
         Some("assemble") => assemble(&a).await,
+        Some("serve") => batch::serve(&a).await,
         _ => run(&a).await,
     }
 }
