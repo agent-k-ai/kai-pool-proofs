@@ -25,7 +25,7 @@ mkdir "$build/chunk-source" "$build/range-source" "$build/provenance"
 CHUNK_SOURCE_COMMIT=598f94eb09fb5d8f5f0beb8b29ade20de5832738
 # Range source is pinned to the reviewed release, the same way as chunk. HEAD is a
 # mutable ref and this script's own contract forbids building from mutable inputs.
-RANGE_SOURCE_COMMIT=9a12b81f3587ccc4e903593fbd52c5ebeb7349eb
+RANGE_SOURCE_COMMIT=598f94eb09fb5d8f5f0beb8b29ade20de5832738
 git -C "$repo" archive "$CHUNK_SOURCE_COMMIT" prover/volume-sp1 | tar -xf - --strip-components=2 -C "$build/chunk-source"
 git -C "$repo" archive "$RANGE_SOURCE_COMMIT" prover/volume-sp1 | tar -xf - --strip-components=2 -C "$build/range-source"
 git -C "$repo" rev-parse "$CHUNK_SOURCE_COMMIT" > "$build/provenance/archived-chunk-commit.txt"
