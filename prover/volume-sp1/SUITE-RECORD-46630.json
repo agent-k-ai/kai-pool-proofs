@@ -169,9 +169,18 @@
     "twoGpuBatch": {
       "note": "Task 11403: `serve --jobs LIST.json --gpus 0,1` runs one worker process per device for the independent jobs, then the dependent jobs in the coordinator. A job may pin a device with a `gpu` field; the rest are balanced by frame bytes. Each worker gets its own CUDA_VISIBLE_DEVICES and a private TMPDIR. A failed worker stops the run before the dependent jobs and leaves the other artifacts on disk.",
       "branch": "feat/11403-two-gpu",
-      "compressedHostSha256": "55570bfb9cf746d6a0defc19e7d37dd65827c953aad055cbb0a3568a5bbe4747",
-      "groth16HostSha256": "39f92a5075102f1c02e3a3927a87b2b574e9df53c3a0b479601cd8eaa209af48",
-      "measuredNote": "Measured on the CPU path: the two-worker coordinator splits two chunks across two workers and the merged per-job public values equal the single-worker batch. The CUDA path needs one container per GPU: sp1-cuda 6.7.0 hardcodes the server socket as /tmp/sp1-cuda-<visible device index>.sock, so two workers in one container collide on /tmp/sp1-cuda-0.sock."
+      "compressedHostSha256": "f9803b9faa99b5e951ade560083235a4659577ea7b6bd02a144d8dadd764aca3",
+      "groth16HostSha256": "da3fc7dc5387bfdabaf283f806bd2a84e69291a4ae7a3f874f821967144d2fca",
+      "buildSourceCommit": "354e3f95cede89147c185067416cf02eb40b284e",
+      "buildImage": "sha256:25377190a4580d1f3708b56f92a83881f6db1d5056bd4a9872852f70ff07141d",
+      "buildCommand": "cargo build --offline --locked --release -j 8 -p volume-chunk-host --bin volume-range-proof --bin volume-range-groth16 --features groth16-native",
+      "runImage": "pmfun/volume-gpu-pilot:20260914 sha256:a94a684dc66eb73ce536d2bc476b70064af7906f817a3d1dd505ec9c9cd14de8",
+      "hostPairNote": "This pair is the pair the 2026-09-16 two-container GPU measurement ran. It replaces 55570bfb9cf746d6a0defc19e7d37dd65827c953aad055cbb0a3568a5bbe4747 and 39f92a5075102f1c02e3a3927a87b2b574e9df53c3a0b479601cd8eaa209af48, which no build of this branch reproduced. The run read the binaries from hostbuild-gpu/target/release and wrote their sha256 plus the plan and slice-list sha256 to logs/gpu-two-containers-c.key.txt.",
+      "measuredNote": "MEASURED on gpubox 2026-09-16, one container per GPU, CudaProver, plan b4027bae6566f39a09f7c94233278eb2426b5b448885487f8249e063767b04ad. Guarded window: vLLM stopped 23:02:07Z, both GPUs free 23:02:10Z, vLLM restarted 23:11:41Z, /v1/models HTTP 200 at 23:13:16Z. slice-a GPU0 {chunk-0, chunk-3} batchWall 406.0 s (prove 218.12 s + 154.31 s); slice-b GPU1 {chunk-2, chunk-1} batchWall 362.9 s (prove 167.79 s + 161.67 s); tail GPU0 batchWall 142.1 s (range merges 4.55 s + 4.92 s, groth16 root 88.70 s). Chunk phase wall 422 s, tail 149 s, total 571 s. All four chunk public values and both range public values equal the single-worker 11398 run on the same plan; every proof reports SDK-verified.",
+      "measuredSpeedup": "MEASURED chunk phase 422 s against 564.2 s of single-worker chunk proves = 1.34x, not the modelled 1.95x. Each chunk pays 18-33 % more while the other card proves: chunk-0 218.12 vs 164.53 s, chunk-3 154.31 vs 124.12 s, chunk-2 167.79 vs 142.28 s, chunk-1 161.67 vs 133.27 s. The two cards are independent, so host CPU and memory bandwidth are the limit. The byte balancer gave 372.4 s against 329.5 s of proves, a 13 % imbalance.",
+      "measuredProjections": "MEASURED parameters (mean chunk 175.5 s, mean range 4.7 s, root 88.7 s, per-worker setup 13.0 s): 12 chunks 1,196 s, grace 34,299 blocks (1.00 h); 23 chunks 2,185 s, grace 62,658 blocks (1.82 h); 34 chunks 3,178 s, grace 91,153 blocks (2.65 h). These replace the modelled 1,005 / 1,804 / 2,603 s, which used the 141.05 s single-worker mean chunk.",
+      "cpuEquivalence": "MEASURED on the CPU path: the two-worker coordinator splits two chunks across two workers and the merged per-job public values equal the single-worker batch. cargo test --test batch_two_gpu: 1 passed, finished in 1628.03 s, exit 0, 2026-09-16T22:28:21Z.",
+      "containerFinding": "The CUDA path needs one container per GPU: sp1-cuda 6.7.0 hardcodes the server socket as /tmp/sp1-cuda-<visible device index>.sock, so two workers in one container collide on /tmp/sp1-cuda-0.sock."
     }
   }
 }
