@@ -106,7 +106,21 @@
     "proofGenerated": false,
     "note": "The recorder refused the first pass with SP1_RANGE_SOURCE_MISMATCH and accepted the second, so the pins are confirmed by the guard, not asserted."
   },
-  "termsDomain": null,
-  "rulesHash": null,
-  "termsNote": "UNPUBLISHED BY 11377. Named, not filled. Epic 10165 section 10 item 3 owns publication."
+  "termsDomain": {
+    "value": "0x7448c6933ab07d6f323a5f2ae25d66a6f3097b14c37b53f7d1debfafe9c83694",
+    "preimage": "AGENT_KAI_PONS_VOLUME_SP1_TERMS_TESTNET_46630_V1",
+    "preimageEncoding": "UTF-8, no trailing newline, 48 bytes",
+    "derivation": "keccak256(UTF-8 preimage)",
+    "reproducedBy": "cast keccak in the pinned foundry image; matches the decision note exactly",
+    "authority": "alloyium-dev decisions/prediction-pools/testnet-protocol-identity-tags-20260913 (authority: authoritative)"
+  },
+  "rulesHash": {
+    "value": "0x275039cd14dfb00f2f7525442936c17834e1b3935fc8b432494a5afcf7887a39",
+    "preimage": "AGENT_KAI_PONS_VOLUME_SP1_RULES_TESTNET_46630_V1",
+    "preimageEncoding": "UTF-8, no trailing newline, 48 bytes",
+    "derivation": "keccak256(UTF-8 preimage)",
+    "reproducedBy": "cast keccak in the pinned foundry image; matches the decision note exactly",
+    "authority": "alloyium-dev decisions/prediction-pools/testnet-protocol-identity-tags-20260913 (authority: authoritative)"
+  },
+  "termsNote": "Explicit namespace/version tags, NOT content hashes of source files. The guest program keys, the suite preimage, the verified runtime and the immutable race terms bind behaviour separately. Decided 2026-09-13 (authoritative note); never carried into the guest line records until now, so 11377s unpublished statement was true of 11377 and not of the fleet. Do not relabel old synthetic proof evidence."
 }
