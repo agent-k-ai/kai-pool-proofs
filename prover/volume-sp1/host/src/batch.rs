@@ -151,10 +151,7 @@ pub async fn run_jobs(list_path: &Path) -> Result<Value> {
     let prover = prover_backend::build_prover().await?;
     let prover_seconds = t0.elapsed().as_secs_f64() - plan_seconds;
     let one_time_seconds = t0.elapsed().as_secs_f64();
-    let backend = match prover_backend::backend()? {
-        prover_backend::Backend::Cuda => "CudaProver",
-        prover_backend::Backend::Cpu => "CpuProver",
-    };
+    let backend = prover_backend::backend()?.prover_label();
 
     let mut keys: BTreeMap<&'static str, EnvProvingKey> = BTreeMap::new();
     let mut key_seconds: BTreeMap<&'static str, f64> = BTreeMap::new();

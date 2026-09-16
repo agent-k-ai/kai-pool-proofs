@@ -164,6 +164,7 @@ async fn main() -> Result<()> {
         fs::write(out.join("stdin.bin"), raw)?;
         let t = Instant::now();
         let cpu = prover_backend::build_prover().await?;
+        m["backend"] = json!(prover_backend::backend()?.prover_label());
         let pk = cpu.setup(Elf::from(data[1].clone())).await?;
         if bincode::serialize(pk.verifying_key())? != bincode::serialize(rvk)? {
             return Err("CPU/Light VK mismatch".into());

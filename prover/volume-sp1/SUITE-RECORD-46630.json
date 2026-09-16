@@ -152,12 +152,13 @@
     },
     "persistentBatch": {
       "note": "Same source with the persistent batch mode (task 11393): `serve --jobs LIST.json` initialises the plan, the prover and both program keys once, then runs chunk jobs, range merges and the Groth16 root in one process. Per-job artifacts keep the per-job names, formats and metric keys; a job whose proof.bin exists is SDK-verified and skipped. SP1 compressed proofs are randomised, so a proof is verified, never compared byte for byte.",
-      "compressedHostSha256": "8171d9b189b85f5e11d0be17193bccffe5700d08d284baec2bb46215a9c14696",
-      "groth16HostSha256": "72f88809d70f01bea9824645ea78df180ef013ebfeba8b14325fe49367548498",
+      "compressedHostSha256": "0d97a933ec1b3d6020f7f4b6d637072d45526cdca2b8a3eeb171e1193fb514d3",
+      "groth16HostSha256": "ca253e2c7ac05410be855d2d68a3a41a65d96fecf05e21a2c728db30b394a65e",
       "branch": "feat/11393-persistent-prover",
       "cpuEquivalence": "2 real 8-block chunks + 1 range merge, CPU, pinned image: per-job mode 782 s of job wall (setups 39.3 + 40.0 + 39.8 s) vs batch 647 s (setups 3.2 + 0.0 + 3.4 s); public values and native journals byte-equal, both proofs SDK-verified in a separate process.",
       "gpuValidation": "3 jobs in one process, cuda, gpubox GPU 0: batch wall 51.0 s, plan load 8.4 s, prover init 0.9 s, key setup 25.5 s (chunk) + 0.08 s (range), prove 3.33 + 3.32 + 4.31 s, job walls 30.1 + 4.6 + 6.9 s, backend CudaProver.",
-      "race1Projection": "Race 1 job set: measured per-job job wall 2785 s (setup 1269 s, proves 825 s). Batch pays the setup once: projected about 875 s (~15 min) on one RTX 3090."
+      "race1Projection": "Race 1 job set: measured per-job job wall 2785 s (setup 1269 s, proves 825 s). Batch pays the setup once: projected about 875 s (~15 min) on one RTX 3090.",
+      "reviewFixes": "task 11392 review item 2: prover_backend::backend() fails closed on a non-Unicode value, and metrics.json backend label comes from the parsed backend instead of a hardcoded CpuProver, in the per-job and batch paths."
     }
   }
 }

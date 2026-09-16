@@ -337,7 +337,7 @@ async fn run(a: &[String]) -> Result<()> {
         cpu.verify(&proof, pk.verifying_key(), Some(StatusCode::SUCCESS))?;
         m["verificationSeconds"] = json!(t.elapsed().as_secs_f64());
         m["sdkExplicitSuccessResult"] = json!("Ok(())");
-        m["backend"] = json!("CpuProver");
+        m["backend"] = json!(prover_backend::backend()?.prover_label());
     }
     let bundle = bincode::serialize(&proof)?;
     m["proofBundleSha256"] = json!(sha(&bundle));

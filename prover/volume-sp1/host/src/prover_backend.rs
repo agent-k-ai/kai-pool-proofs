@@ -21,6 +21,16 @@ pub enum Backend {
     Cuda,
 }
 
+impl Backend {
+    /// The label written to `metrics.json` by the per-job and batch proofs.
+    pub fn prover_label(self) -> &'static str {
+        match self {
+            Backend::Cpu => "CpuProver",
+            Backend::Cuda => "CudaProver",
+        }
+    }
+}
+
 /// Parses a `PROVER_BACKEND` value. `None` means the variable is unset.
 pub fn parse(value: Option<&str>) -> Result<Backend, String> {
     match value {
@@ -33,10 +43,14 @@ pub fn parse(value: Option<&str>) -> Result<Backend, String> {
 }
 
 /// Validates `PROVER_BACKEND` and returns the selection. Call this before any
-/// output directory or proving work so a bad value fails fast.
+/// output directory or proving work so a bad value fails fast. A non-Unicode
+/// value fails closed; it never falls back to the CPU prover.
 pub fn backend() -> Result<Backend, String> {
-    let raw = std::env::var("PROVER_BACKEND").ok();
-    parse(raw.as_deref())
+    match std::env::var("PROVER_BACKEND") {
+        Err(std::env::VarError::NotPresent) => parse(None),
+        Err(error) => Err(error.to_string()),
+        Ok(value) => parse(Some(&value)),
+    }
 }
 
 /// Builds the prover that `PROVER_BACKEND` selects.
@@ -64,6 +78,31 @@ mod tests {
     #[test]
     fn cuda_selects_cuda() {
         assert_eq!(parse(Some("cuda")), Ok(Backend::Cuda));
+    }
+
+    #[test]
+    fn non_unicode_value_fails_closed() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+        let key = "PROVER_BACKEND";
+        let previous = std::env::var_os(key);
+        std::env::set_var(key, OsString::from_vec(vec![0xff, 0xfe]));
+        let result = backend();
+        match previous {
+            Some(value) => std::env::set_var(key, value),
+            None => std::env::remove_var(key),
+        }
+        let error = result.expect_err("a non-Unicode value must not select a prover");
+        assert!(
+            error.to_lowercase().contains("unicode"),
+            "the error must name the cause: {error}"
+        );
+    }
+
+    #[test]
+    fn labels_match_the_prover() {
+        assert_eq!(Backend::Cpu.prover_label(), "CpuProver");
+        assert_eq!(Backend::Cuda.prover_label(), "CudaProver");
     }
 
     #[test]
