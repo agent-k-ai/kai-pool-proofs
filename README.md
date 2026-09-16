@@ -134,11 +134,12 @@ Config file (`public-config.json`), all values supplied by the user:
 
 ```json
 {
-  "rpcUrls": ["https://user-provided-rpc"],
+  "rpcUrls": ["http://127.0.0.1:8545", "https://user-provided-rpc"],
   "chainId": 46630,
   "keystorePath": "./wallet/keystore.json",
   "spendCapWei": "10000000000000",
-  "adapter": "0x..."
+  "adapter": "0x...",
+  "rpcPacing": { "requestsPerSecond": 25 }
 }
 ```
 
@@ -148,6 +149,9 @@ Rules:
   passphrase comes from the `VOLUME_PROOF_PASSPHRASE` environment variable;
   a raw key is never passed in CLI arguments.
 - The user's RPC must report chain `46630`; the CLI refuses otherwise.
+- `rpcUrls` is ordered and every entry is paced on its own budget. Put a local node first and a
+  public endpoint after it. The client honours `Retry-After` on HTTP 429 and 503, backs off with
+  jitter, and tries another endpoint before it waits. A chain-id mismatch never falls back.
 - Explicit spend caps, checked before signing. No fallback to an operator
   endpoint or key.
 - The header hash and receipt root are reconstructed independently.

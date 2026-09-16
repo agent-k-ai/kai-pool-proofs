@@ -68,6 +68,39 @@ This command establishes a positive diagnostic chunk proof only. It does not
 implement recursive child-status design, range/full-race acceptance, canonical
 chain admission, EVM/Groth16 verification, funding, deployment or publication.
 
+## Frames from an RPC
+
+The host reads frames from a file. The Node CLI captures those files (`capture-chunk`), and the
+caller owns the endpoint list. Give the endpoints in the order they must be tried:
+
+1. a local node of the same chain (the intended primary), then
+2. a public endpoint as a paced fallback.
+
+The client paces each endpoint separately (`rpcPacing.requestsPerSecond`) and reads HTTP 429 and 503
+as rate signals, not as dead endpoints: it honours `Retry-After`, backs off with jitter, and tries an
+unaffected endpoint first. A transport error or a timeout parks that endpoint for `urlBlockMs`, then
+the client moves on. A chain-id mismatch and a log-limit error are definitive: the command stops and
+never falls back. The client starts each request at the endpoint that served last, so a healthy local
+node stays the primary.
+
+`capture-chunk` returns the endpoint counters in its result, under `rpc`: requests, calls, retries,
+throttles, transport failures, wait time, and the same numbers per endpoint. A slow capture is
+therefore explainable from the capture report alone.
+
+```json
+{
+  "rpcUrls": ["http://192.168.222.45:18647", "https://rpc.mainnet.chain.robinhood.com"],
+  "chainId": 4663,
+  "rpcPacing": { "requestsPerSecond": 50 }
+}
+```
+
+The first entry above is the local Robinhood mainnet node on gpubox (RPC `192.168.222.45:18647`,
+WebSocket `18648`); it is the intended primary and it tolerates a high rate. A public endpoint that
+is the only source wants a low `requestsPerSecond` (the default is 5). Every `rpcPacing` key is
+optional: `requestsPerSecond`, `maxAttempts`, `baseBackoffMs`, `maxBackoffMs`, `requestTimeoutMs` and
+`urlBlockMs`.
+
 ## Persistent batch mode
 
 `volume-range-proof serve --jobs LIST.json` (and the same subcommand in

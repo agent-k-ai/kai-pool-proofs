@@ -68,7 +68,7 @@ function readJsonFile(path: string): unknown {
 
 /** Builds the default RPC client from the config. */
 export function makeRpc(config: PublicConfig): ReadRpc {
-  return new HttpRpc(config.chainId, config.rpcUrls);
+  return new HttpRpc(config.chainId, config.rpcUrls, fetch, config.rpcPacing ?? {});
 }
 
 /**
@@ -683,5 +683,8 @@ export async function captureChunk(ctx: CommandContext, args: CaptureChunkArgs):
     frames: captured.frames.length,
     termsHash: termsHash(terms),
     blocks: captured.blocks,
+    // How the endpoints behaved: the capture report carries the pacing,
+    // throttle and failover evidence, so a slow capture is explainable.
+    rpc: ctx.rpc.stats?.() ?? null,
   };
 }

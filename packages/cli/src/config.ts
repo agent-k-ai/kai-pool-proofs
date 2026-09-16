@@ -9,6 +9,7 @@
  * Apache-2.0. Copyright 2026 Alpha Tech Organization.
  */
 import { isAddress, type Address } from "viem";
+import { DEFAULT_RPC_PACING, type RpcPacing } from "@kai-pool-proofs/volume-proof";
 
 /**
  * The reference chain id for the first SP1 volume testnet profile.
@@ -29,10 +30,54 @@ export interface PublicConfig {
   spendCapWei?: string;
   /** Optional adapter address override (otherwise read from the controller). */
   adapter?: Address;
+  /**
+   * Optional endpoint pacing. An ordered list with a local node first wants a
+   * high `requestsPerSecond`; a public fallback endpoint wants a low one. The
+   * defaults live in DEFAULT_RPC_PACING.
+   */
+  rpcPacing?: RpcPacing;
 }
 
 function fail(code: string, detail: string): never {
   throw new Error(`${code}: ${detail}`);
+}
+
+/** The pacing keys a config may set. Each is optional and positive. */
+const PACING_KEYS = [
+  "requestsPerSecond",
+  "maxAttempts",
+  "baseBackoffMs",
+  "maxBackoffMs",
+  "requestTimeoutMs",
+  "urlBlockMs",
+] as const;
+
+/** Validates an optional `rpcPacing` object. Unknown keys are refused. */
+function readPacing(raw: unknown): RpcPacing | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    fail("CONFIG_INVALID", "rpcPacing must be an object");
+  }
+  const value = raw as Record<string, unknown>;
+  for (const key of Object.keys(value)) {
+    if (!(PACING_KEYS as readonly string[]).includes(key)) {
+      fail("CONFIG_INVALID", `rpcPacing has an unknown key: ${key}`);
+    }
+  }
+  const pacing: RpcPacing = {};
+  for (const key of PACING_KEYS) {
+    const entry = value[key];
+    if (entry === undefined) continue;
+    const fallback = DEFAULT_RPC_PACING[key];
+    if (typeof entry !== "number" || !Number.isFinite(entry) || entry <= 0) {
+      fail("CONFIG_INVALID", `rpcPacing.${key} must be a positive number`);
+    }
+    if (key !== "requestsPerSecond" && !Number.isSafeInteger(entry)) {
+      fail("CONFIG_INVALID", `rpcPacing.${key} must be a whole number`);
+    }
+    (pacing as Record<string, number>)[key] = entry;
+  }
+  return pacing;
 }
 
 /** Parses and validates a public config object. */
@@ -59,7 +104,9 @@ export function loadPublicConfig(raw: unknown): PublicConfig {
   if (typeof chainId !== "number" || !Number.isSafeInteger(chainId) || chainId <= 0) {
     fail("CONFIG_CHAIN", `chainId must be a positive integer, got ${String(chainId)}`);
   }
+  const rpcPacing = readPacing(value.rpcPacing);
   const config: PublicConfig = { rpcUrls: [...rpcUrls], chainId };
+  if (rpcPacing) config.rpcPacing = rpcPacing;
   if (value.keystorePath !== undefined) {
     if (typeof value.keystorePath !== "string" || value.keystorePath.length === 0) {
       fail("CONFIG_INVALID", "keystorePath must be a non-empty string");

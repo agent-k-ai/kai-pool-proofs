@@ -22,6 +22,32 @@ describe("loadPublicConfig", () => {
     expect(config.chainId).not.toBe(SUPPORTED_CHAIN_ID);
   });
 
+  it("accepts an ordered endpoint list and keeps the order", () => {
+    const config = loadPublicConfig({
+      rpcUrls: ["http://192.168.222.45:18647", "https://rpc.public.example"],
+      chainId: 4663,
+    });
+    expect(config.rpcUrls).toEqual(["http://192.168.222.45:18647", "https://rpc.public.example"]);
+  });
+
+  it("accepts an rpcPacing object and defaults the keys the config omits", () => {
+    const config = loadPublicConfig({
+      rpcUrls: ["http://127.0.0.1:8545"],
+      chainId: 46630,
+      rpcPacing: { requestsPerSecond: 25, maxAttempts: 6 },
+    });
+    expect(config.rpcPacing).toEqual({ requestsPerSecond: 25, maxAttempts: 6 });
+  });
+
+  it("refuses an unknown, negative or fractional pacing key", () => {
+    const base = { rpcUrls: ["http://127.0.0.1:8545"], chainId: 46630 };
+    expect(() => loadPublicConfig({ ...base, rpcPacing: { burst: 2 } })).toThrow("CONFIG_INVALID");
+    expect(() => loadPublicConfig({ ...base, rpcPacing: { requestsPerSecond: 0 } })).toThrow("CONFIG_INVALID");
+    expect(() => loadPublicConfig({ ...base, rpcPacing: { baseBackoffMs: 1.5 } })).toThrow("CONFIG_INVALID");
+    expect(() => loadPublicConfig({ ...base, rpcPacing: 5 })).toThrow("CONFIG_INVALID");
+    expect(() => loadPublicConfig({ ...base, rpcPacing: [] })).toThrow("CONFIG_INVALID");
+  });
+
   it("refuses a chain id that is not a positive integer", () => {
     expect(() => loadPublicConfig({ rpcUrls: ["http://127.0.0.1:8545"], chainId: 0 })).toThrow("CONFIG_CHAIN");
   });
