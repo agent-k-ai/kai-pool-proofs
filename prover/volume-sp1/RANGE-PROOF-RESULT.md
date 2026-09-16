@@ -91,13 +91,13 @@ No source/manifest identity is inserted into its own guest build.
 | Range serialized VK SHA-256 | `16f5ec78bbaaa8ba211dc5a0ada672df3b78ee7c354d91cb257b694f413f3a48` |
 | Suite preimage, 192 bytes, SHA-256 | `a32047d413b9303ae8c6dee9f2d3a6319984f27afad3382fcc348cf3601bb31f` |
 | Suite Ethereum Keccak-256 | `41985ba0b3a5662670dbfb5d2a090aaf4d5c6ba1cb2d84da879d165d583c9a14` |
-**Synthetic verifier fields, rehearsal only; deployable suite = `SUITE-RECORD-46630.json`, proofSuiteHash `0x9e4d1f8fea474949376c71febbdfd6e196da3d1404c6868e8053e2655e995f07`.**
-
 | Terms ABI, 4,352 bytes, SHA-256 | `b086ecdd68b638eea6e5bb9b5f1447b4ef67bd633930140f3f20bf10362c82ff` |
 | Terms Ethereum Keccak-256 | `f0976d5c768e2f2ec64084ea300f21ef5ab9f3867308b8fe23383e5870bf8e81` |
 | Source manifest SHA-256 | `0f2e8449d2c8dc693e4b0f3e51177acec37cda3a59ad26f5b64a2a1be72bca78` |
 | Producer executable SHA-256 | `557cd76261c947bb631863420c25d185e15ad9c3956a6307b35704613f578001` |
 | Retained runner SHA-256 | `99655ab85740820a1ab7bdc282b461ca23d8a27d1b53cb7c5e04074cea093b98` |
+
+**Synthetic verifier fields, rehearsal only; deployable suite = `SUITE-RECORD-46630.json`, proofSuiteHash `0x9e4d1f8fea474949376c71febbdfd6e196da3d1404c6868e8053e2655e995f07`.**
 
 ### How the serialized VK SHA-256 rows are derived
 
