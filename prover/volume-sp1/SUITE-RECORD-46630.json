@@ -165,6 +165,13 @@
       "branch": "feat/11399-batch-validation",
       "compressedHostSha256": "4438f9c229fb8d7023aaaa97ec389a9b8ae835791e7ac224e529404b5d89a91e",
       "groth16HostSha256": "22de015650a973214ac70617003442f5228c12cc264b0af05272390daf7e4809"
+    },
+    "twoGpuBatch": {
+      "note": "Task 11403: `serve --jobs LIST.json --gpus 0,1` runs one worker process per device for the independent jobs, then the dependent jobs in the coordinator. A job may pin a device with a `gpu` field; the rest are balanced by frame bytes. Each worker gets its own CUDA_VISIBLE_DEVICES and a private TMPDIR. A failed worker stops the run before the dependent jobs and leaves the other artifacts on disk.",
+      "branch": "feat/11403-two-gpu",
+      "compressedHostSha256": "55570bfb9cf746d6a0defc19e7d37dd65827c953aad055cbb0a3568a5bbe4747",
+      "groth16HostSha256": "39f92a5075102f1c02e3a3927a87b2b574e9df53c3a0b479601cd8eaa209af48",
+      "measuredNote": "Measured on the CPU path: the two-worker coordinator splits two chunks across two workers and the merged per-job public values equal the single-worker batch. The CUDA path needs one container per GPU: sp1-cuda 6.7.0 hardcodes the server socket as /tmp/sp1-cuda-<visible device index>.sock, so two workers in one container collide on /tmp/sp1-cuda-0.sock."
     }
   }
 }

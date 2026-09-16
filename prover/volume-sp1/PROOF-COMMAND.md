@@ -151,6 +151,33 @@ The command prints one batch summary as JSON: `jobCount`, `backend`, the
 per-job records, the one-time setup seconds, the per-role key setup seconds and
 `batchWallSeconds`.
 
+### Two GPUs
+
+`serve --jobs LIST.json --gpus 0,1` runs one worker process per device. The SP1 gpu-server is a
+single-GPU process: it owns one CUDA context and the device comes from `CUDA_VISIBLE_DEVICES`, so the
+split is external and each worker starts its own gpu-server on its own device. The coordinator keeps
+the plan load, the prover and the key set inside each worker, and it gives every worker a private
+`TMPDIR`, because the prover extracts a helper binary there.
+
+The coordinator splits the list itself:
+
+1. Jobs that consume no child and that no other job consumes are the parallel set.
+2. Each parallel job goes to a device. A job may pin one with `"gpu": 1` in the job list; the others
+   are placed by frame bytes, heaviest first onto the least loaded device (`LPT`).
+3. One worker process runs each slice; the coordinator waits for all of them.
+4. The dependent jobs (range merges, then the root) then run in the coordinator, in list order. The
+   retained chunk proofs make that pass a verify-and-skip pass for the chunks.
+
+A worker failure stops the run before the dependent jobs, names the device and the jobs of that
+slice, and leaves the other workers' artifacts on disk. A second run resumes them.
+
+Safety does not change: check both devices are free (at least 22,000 MiB each), record the idle
+evidence for every vLLM instance, keep `--shm-size 16g`, and never overwrite a retained artifact.
+
+`--gpus 0,0` runs two workers on one device. The CPU-mode test uses this to compare the split result
+with the single-worker result. `KAI_BATCH_WORKER_BIN` names the worker binary; a test sets it because
+its own executable is the test harness.
+
 ### Launching a long job
 
 Bound every long batch with the cgroup of a systemd user unit, not with `nohup` or a bare `setsid`:
