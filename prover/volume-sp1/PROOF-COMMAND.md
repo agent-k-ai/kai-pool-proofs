@@ -96,7 +96,7 @@ therefore explainable from the capture report alone.
 ```
 
 The first entry above is the local Robinhood mainnet node on gpubox (RPC `192.168.222.45:18647`,
-WebSocket `18648`); it is the intended primary and it tolerates a high rate. A public endpoint that
+WebSocket `18648`); when the node is up it is the intended primary and it tolerates a high rate. A public endpoint that
 is the only source wants a low `requestsPerSecond` (the default is 5). Every `rpcPacing` key is
 optional: `requestsPerSecond`, `maxAttempts`, `baseBackoffMs`, `maxBackoffMs`, `requestTimeoutMs` and
 `urlBlockMs`.

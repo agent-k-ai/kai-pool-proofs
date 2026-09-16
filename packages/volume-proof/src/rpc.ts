@@ -30,17 +30,90 @@
 import { numberToHex } from "viem";
 import { readBoundedJsonRpcResponse } from "./bounded-json-rpc.js";
 
+/**
+ * What the client knows when a request cannot be served. A caller must be able
+ * to say which endpoint answered what, and after how many attempts.
+ */
+export interface RpcFailureDetail {
+  /** The last endpoint tried. */
+  url?: string;
+  /** The HTTP status of the last failure, when the endpoint answered. */
+  status?: number;
+  /** HTTP attempts this request made. */
+  attempts?: number;
+  /** The last `Retry-After`, in milliseconds. Null when the endpoint did not say. */
+  retryAfterMs?: number | null;
+  /** The underlying transport error, one line, bounded. */
+  causeText?: string;
+}
+
+const CAUSE_TEXT_MAX = 120;
+
+function boundedCause(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const text = `${error.name}: ${error.message}`.replace(/\s+/g, " ").trim();
+  return text.length > CAUSE_TEXT_MAX ? `${text.slice(0, CAUSE_TEXT_MAX)}...` : text;
+}
+
+function rpcFailureMessage(tooManyLogs: boolean, detail: RpcFailureDetail): string {
+  if (tooManyLogs) return "RPC_LOG_LIMIT";
+  const parts = ["RPC_UNAVAILABLE"];
+  if (detail.url !== undefined) parts.push(`url=${detail.url}`);
+  if (detail.status !== undefined) parts.push(`status=${detail.status}`);
+  if (detail.attempts !== undefined) parts.push(`attempts=${detail.attempts}`);
+  if (detail.retryAfterMs !== undefined) parts.push(`retryAfterMs=${detail.retryAfterMs}`);
+  if (detail.causeText !== undefined) parts.push(`cause=${detail.causeText}`);
+  return parts.join(" ");
+}
+
+/** A failed request. The message names the endpoint, the status and the attempt count. */
 export class RpcFailure extends Error {
-  constructor(readonly tooManyLogs = false) {
-    super(tooManyLogs ? "RPC_LOG_LIMIT" : "RPC_UNAVAILABLE");
+  readonly url?: string;
+  readonly status?: number;
+  readonly attempts?: number;
+  /** The last `Retry-After`, in milliseconds. `null` when the endpoint did not say. */
+  readonly retryAfterMs?: number | null;
+  readonly causeText?: string;
+
+  constructor(
+    readonly tooManyLogs = false,
+    detail: RpcFailureDetail = {},
+  ) {
+    super(rpcFailureMessage(tooManyLogs, detail));
+    this.name = "RpcFailure";
+    this.url = detail.url;
+    this.status = detail.status;
+    this.attempts = detail.attempts;
+    this.retryAfterMs = detail.retryAfterMs;
+    this.causeText = detail.causeText;
   }
 }
 
 /** The endpoint answered 429 or 503. `retryAfterMs` is set when it said so. */
 export class RpcThrottled extends RpcFailure {
-  constructor(readonly retryAfterMs: number | null) {
-    super(false);
+  constructor(
+    readonly retryAfterMs: number | null,
+    detail: RpcFailureDetail = {},
+  ) {
+    super(false, { ...detail, retryAfterMs: retryAfterMs ?? undefined });
   }
+}
+
+/**
+ * The error a caller sees when the budget is exhausted. It keeps the last
+ * failure's detail and fills in what the attempt loop knows.
+ */
+function exhausted(lastError: unknown, lastUrl: string | undefined, attempts: number): RpcFailure {
+  const detail: RpcFailureDetail = { url: lastUrl, attempts };
+  if (lastError instanceof RpcFailure) {
+    detail.url = lastError.url ?? lastUrl;
+    detail.status = lastError.status;
+    if (lastError.retryAfterMs !== undefined) detail.retryAfterMs = lastError.retryAfterMs;
+    if (lastError.causeText !== undefined) detail.causeText = lastError.causeText;
+    return new RpcFailure(lastError.tooManyLogs, detail);
+  }
+  if (lastError !== undefined) detail.causeText = boundedCause(lastError);
+  return new RpcFailure(false, detail);
 }
 
 /** The read surface the proof path needs. Injected, never a singleton. */
@@ -229,10 +302,12 @@ export class HttpRpc implements ReadRpc {
     this.totals.requests += 1;
     let attempts = 0;
     let lastError: unknown;
+    let lastUrl: string | undefined;
     for (let round = 0; round < this.pacing.maxAttempts; round += 1) {
       for (const url of this.order()) {
         if ((this.blockedUntil.get(url) ?? 0) > this.now()) continue;
         attempts += 1;
+        lastUrl = url;
         if (attempts > 1) this.totals.retries += 1;
         try {
           const result = await this.callOnce<T>(url, method, params);
@@ -255,9 +330,7 @@ export class HttpRpc implements ReadRpc {
         }
       }
     }
-    if (lastError instanceof RpcThrottled) throw new RpcFailure();
-    if (lastError instanceof Error) throw lastError;
-    throw new RpcFailure();
+    throw exhausted(lastError, lastUrl, attempts);
   }
 
   async head(): Promise<Header> {
@@ -331,8 +404,8 @@ export class HttpRpc implements ReadRpc {
       const status = response.status;
       const retryAfter = parseRetryAfter(response.headers.get("retry-after"), this.now());
       await response.body?.cancel();
-      if (status === 429 || status === 503) throw new RpcThrottled(retryAfter);
-      throw new RpcFailure();
+      if (status === 429 || status === 503) throw new RpcThrottled(retryAfter, { url, status });
+      throw new RpcFailure(false, { url, status });
     }
     const body = (await readBoundedJsonRpcResponse<{ result?: T; error?: { code?: number; message?: string } }>(
       response,
@@ -343,8 +416,9 @@ export class HttpRpc implements ReadRpc {
         /10,?000|too many (logs|results)|query returned more|response size|limit.*logs/i.test(
           body.error.message ?? "",
         ),
+        { url, causeText: `json-rpc ${body.error.code ?? ""} ${body.error.message ?? ""}`.trim() },
       );
-    if (body.result === undefined) throw new RpcFailure();
+    if (body.result === undefined) throw new RpcFailure(false, { url });
     if (body.result === null) {
       if (!NULLABLE_METHODS.has(method)) throw new RpcFailure();
       this.totals.ok += 1;

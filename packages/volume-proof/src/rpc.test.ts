@@ -9,7 +9,7 @@
  * Apache-2.0. Copyright 2026 Alpha Tech Organization.
  */
 import { describe, expect, it } from "vitest";
-import { HttpRpc, parseRetryAfter, type RpcRuntime } from "./rpc.js";
+import { HttpRpc, parseRetryAfter, RpcFailure, type RpcRuntime } from "./rpc.js";
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   const payload = JSON.stringify(body);
@@ -256,6 +256,63 @@ describe("HttpRpc", () => {
     // Random 1: the jitter is exhaustive, so the backoffs are the raw values.
     // Four backoffs for five attempts: the last one is never slept.
     expect(time.waits).toEqual([200, 250, 500, 1_000, 1_000]);
+  });
+
+  it("names the endpoint, the status and the attempt count when the budget runs out", async () => {
+    const fetcher = makeFetcher((_url, method) =>
+      method === "eth_chainId" ? rpcResult(CHAIN) : new Response("boom", { status: 500 }),
+    );
+    const rpc = new HttpRpc(46630, ["http://dead.example"], fetcher, { maxAttempts: 2 }, clock());
+    const error = await rpc.request("eth_blockNumber", []).then(
+      () => null,
+      (failure: RpcFailure) => failure,
+    );
+    expect(error).toBeInstanceOf(RpcFailure);
+    // Every field is asserted on its own, so dropping one turns this test red.
+    expect(error?.url).toBe("http://dead.example");
+    expect(error?.status).toBe(500);
+    // A failed endpoint is parked for urlBlockMs, so one attempt is made here.
+    expect(error?.attempts).toBe(1);
+    expect(error?.retryAfterMs).toBeUndefined();
+    expect(error?.message).toBe("RPC_UNAVAILABLE url=http://dead.example status=500 attempts=1");
+  });
+
+  it("keeps Retry-After and the attempt count on an exhausted throttle", async () => {
+    const fetcher = makeFetcher((_url, method) =>
+      method === "eth_chainId"
+        ? rpcResult(CHAIN)
+        : new Response("throttled", { status: 429, headers: { "retry-after": "3" } }),
+    );
+    const rpc = new HttpRpc(46630, ["http://busy.example"], fetcher, { maxAttempts: 3 }, clock());
+    const error = await rpc.request("eth_blockNumber", []).then(
+      () => null,
+      (failure: RpcFailure) => failure,
+    );
+    expect(error?.url).toBe("http://busy.example");
+    expect(error?.status).toBe(429);
+    expect(error?.attempts).toBe(3);
+    expect(error?.retryAfterMs).toBe(3_000);
+    expect(error?.message).toBe(
+      "RPC_UNAVAILABLE url=http://busy.example status=429 attempts=3 retryAfterMs=3000",
+    );
+  });
+
+  it("names the endpoint and the cause when every attempt is a transport failure", async () => {
+    const fetcher = (async () => {
+      throw new Error("ECONNREFUSED");
+    }) as typeof fetch;
+    const rpc = new HttpRpc(46630, ["http://gone.example"], fetcher, { maxAttempts: 2 }, clock());
+    const error = await rpc.request("eth_blockNumber", []).then(
+      () => null,
+      (failure: RpcFailure) => failure,
+    );
+    expect(error?.url).toBe("http://gone.example");
+    expect(error?.status).toBeUndefined();
+    expect(error?.attempts).toBe(1);
+    expect(error?.causeText).toBe("Error: ECONNREFUSED");
+    expect(error?.message).toBe(
+      "RPC_UNAVAILABLE url=http://gone.example attempts=1 cause=Error: ECONNREFUSED",
+    );
   });
 
   it("gives up after maxAttempts rounds when every endpoint is throttled", async () => {

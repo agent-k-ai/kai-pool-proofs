@@ -38,6 +38,7 @@ import {
   type VolumeTermsV1,
 } from "@kai-pool-proofs/volume-proof";
 import { loadPublicConfig } from "./config.js";
+import { RpcFailure } from "@kai-pool-proofs/volume-proof";
 import {
   captureChunk,
   confirmSubmission,
@@ -720,6 +721,56 @@ describe("captureChunk", () => {
     terms.terminalExpiry += shift;
     return terms;
   }
+
+  it("passes an exhausted RPC failure through unchanged", async () => {
+    const terms = shiftedTerms();
+    const parent = decodeRobinhoodHeader(fixture.fixture.block.canonicalHeaderRlp).parentHash;
+    const dir = mkdtempSync(join(process.cwd(), "capture-chunk-test-"));
+    try {
+      const termsPath = join(dir, "terms.hex");
+      writeFileSync(termsPath, encodeTermsAbi(terms));
+      const config = loadPublicConfig({ rpcUrls: ["http://127.0.0.1:1"], chainId: 46630 });
+      // The client reports the endpoint, the status and the attempt count. The
+      // CLI must not replace the error, so the message keeps those fields.
+      const failure = new RpcFailure(false, {
+        url: "http://busy.example",
+        status: 429,
+        attempts: 3,
+        retryAfterMs: 3_000,
+      });
+      const rpc = {
+        request: async () => {
+          throw failure;
+        },
+        head: async () => {
+          throw failure;
+        },
+        block: async () => {
+          throw failure;
+        },
+      };
+      const ctx: CommandContext = { config, rpc };
+      const raised = await captureChunk(ctx, {
+        termsPath,
+        beneficiary: `0x${"42".repeat(20)}`,
+        coverageMask: 15,
+        fromExclusive: BLOCK - 1,
+        toInclusive: BLOCK,
+        beforeHash: parent,
+        endHash: fixture.fixture.block.hash,
+        outPath: join(dir, "chunk.frames"),
+      }).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      expect(raised).toBe(failure);
+      expect((raised as Error).message).toBe(
+        "RPC_UNAVAILABLE url=http://busy.example status=429 attempts=3 retryAfterMs=3000",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 
   it("writes the golden-compatible frame file and reports the summary", async () => {
     const terms = shiftedTerms();
