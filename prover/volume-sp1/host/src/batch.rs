@@ -26,6 +26,7 @@ use std::{
     error::Error,
     fs,
     path::{Path, PathBuf},
+    process::{Command, Stdio},
     time::Instant,
 };
 
@@ -35,6 +36,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 pub const JOBLIST_KIND: &str = "kai-volume-range-batch/v1";
 
 /// One scheduled job.
+#[derive(Clone)]
 struct Job {
     id: String,
     form: String,
@@ -44,17 +46,61 @@ struct Job {
     children: Vec<(Role, PathBuf)>,
     parameter_manifest: Option<PathBuf>,
     source_manifest: Option<PathBuf>,
+    /// Optional GPU pin for the two-GPU coordinator. `None` means balanced.
+    gpu: Option<u32>,
 }
 
-/// `serve --jobs LIST.json`
+/// `serve --jobs LIST.json [--gpus 0,1]`
+///
+/// Without `--gpus` one worker runs the whole list in order. With `--gpus` the
+/// coordinator runs the independent jobs on one worker process per device and
+/// then the dependent jobs (range merges, root) in one worker.
 pub async fn serve(args: &[String]) -> Result<()> {
-    let path = match (args.get(2).map(String::as_str), args.get(3)) {
-        (Some("--jobs"), Some(p)) if args.len() == 4 => p.clone(),
-        _ => return Err("serve --jobs LIST.json".into()),
+    let mut path: Option<String> = None;
+    let mut gpus: Vec<u32> = Vec::new();
+    let mut index = 2;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--jobs" if path.is_none() => {
+                path = Some(
+                    args.get(index + 1)
+                        .ok_or("serve --jobs LIST.json [--gpus 0,1]")?
+                        .clone(),
+                );
+                index += 2;
+            }
+            "--gpus" if gpus.is_empty() => {
+                let raw = args.get(index + 1).ok_or("serve --gpus 0,1")?;
+                gpus = parse_gpus(raw)?;
+                index += 2;
+            }
+            _ => return Err("serve --jobs LIST.json [--gpus 0,1]".into()),
+        }
+    }
+    let path = path.ok_or("serve --jobs LIST.json [--gpus 0,1]")?;
+    let summary = match gpus.len() {
+        0 | 1 => run_jobs(Path::new(&path)).await?,
+        _ => run_jobs_on_gpus(Path::new(&path), &gpus).await?,
     };
-    let summary = run_jobs(Path::new(&path)).await?;
     println!("{summary}");
     Ok(())
+}
+
+/// Parses `--gpus 0,1`. Repeats are allowed, so `--gpus 0,0` runs two workers
+/// on one device (the CPU-mode test uses this).
+fn parse_gpus(raw: &str) -> Result<Vec<u32>> {
+    if raw.is_empty() {
+        return Err("--gpus needs a comma-separated device list, for example 0,1".into());
+    }
+    let mut gpus = Vec::new();
+    for part in raw.split(',') {
+        let device: u32 = part
+            .trim()
+            .parse()
+            .map_err(|_| format!("--gpus: {part} is not a device index"))?;
+        gpus.push(device);
+    }
+    Ok(gpus)
 }
 
 fn str_field(v: &Value, key: &str) -> Result<String> {
@@ -183,6 +229,15 @@ fn parse_jobs(doc: &Value, base: &Path) -> Result<Vec<Job>> {
                 children.push((child_role, base.join(child_path)));
             }
         }
+        let gpu = match entry.get("gpu") {
+            None => None,
+            Some(value) => {
+                let index = value
+                    .as_u64()
+                    .ok_or_else(|| format!("job {id}: gpu must be a device index"))?;
+                Some(u32::try_from(index).map_err(|_| format!("job {id}: gpu index is too large"))?)
+            }
+        };
         let parameter_manifest = entry
             .get("parameterManifest")
             .and_then(Value::as_str)
@@ -200,13 +255,14 @@ fn parse_jobs(doc: &Value, base: &Path) -> Result<Vec<Job>> {
             children,
             parameter_manifest,
             source_manifest,
+            gpu,
         });
     }
     Ok(jobs)
 }
 
-/// Runs one job list. Returns the batch summary.
-pub async fn run_jobs(list_path: &Path) -> Result<Value> {
+/// Reads one job list, checks its kind and resolves its plan directory.
+fn read_list(list_path: &Path) -> Result<(Value, PathBuf, PathBuf, Vec<Job>)> {
     let raw = fs::read(list_path)?;
     let doc: Value = serde_json::from_slice(&raw)?;
     if doc.get("kind").and_then(Value::as_str) != Some(JOBLIST_KIND) {
@@ -217,7 +273,17 @@ pub async fn run_jobs(list_path: &Path) -> Result<Value> {
     let jobs = parse_jobs(&doc, &base)?;
     // Fail before the plan load and any proving work.
     validate_jobs(&jobs)?;
+    Ok((doc, base, plan_dir, jobs))
+}
 
+/// Runs one job list. Returns the batch summary.
+pub async fn run_jobs(list_path: &Path) -> Result<Value> {
+    let (_doc, _base, plan_dir, jobs) = read_list(list_path)?;
+    run_parsed(plan_dir, &jobs).await
+}
+
+/// Runs the given jobs with one plan load, one prover and one key set.
+async fn run_parsed(plan_dir: PathBuf, jobs: &[Job]) -> Result<Value> {
     let t0 = Instant::now();
     let plan = Plan::load(&plan_dir).await?;
     let plan_seconds = t0.elapsed().as_secs_f64();
@@ -266,7 +332,7 @@ pub async fn run_jobs(list_path: &Path) -> Result<Value> {
         records.push(record);
     }
 
-    Ok(json!({
+    let mut summary = json!({
         "kind": "kai-volume-range-batch-result/v1",
         "plan": plan_dir,
         "planSha256": plan.manifest_sha,
@@ -278,6 +344,246 @@ pub async fn run_jobs(list_path: &Path) -> Result<Value> {
         "oneTimeSetupSeconds": one_time_seconds,
         "keySetupSecondsByRole": key_seconds,
         "batchWallSeconds": t0.elapsed().as_secs_f64(),
+    });
+    // A worker reports the device the coordinator gave it.
+    if let Ok(gpu) = std::env::var("KAI_BATCH_GPU") {
+        if let Ok(index) = gpu.parse::<u32>() {
+            summary["gpu"] = json!(index);
+        }
+    }
+    Ok(summary)
+}
+
+/// The weight used to balance the parallel jobs: the frame bytes on disk.
+/// A missing file weighs 1, so the split still runs and the job reports the
+/// read error itself.
+fn job_weight(job: &Job) -> u64 {
+    fs::metadata(&job.frames).map(|meta| meta.len()).unwrap_or(1)
+}
+
+/// Splits the list into the jobs that can run in parallel and the jobs that
+/// depend on them. A job is parallel when it consumes no child: a chunk proof
+/// does not depend on another chunk, even when a later range merge consumes it.
+/// The dependent jobs keep list order, so the range merges and the root still
+/// run after every chunk exists. `validate_jobs` already refused a list whose
+/// dependent job appears before its children.
+fn parallel_and_tail(jobs: &[Job]) -> (Vec<usize>, Vec<usize>) {
+    let mut parallel = Vec::new();
+    let mut tail = Vec::new();
+    for (index, job) in jobs.iter().enumerate() {
+        if job.children.is_empty() {
+            parallel.push(index);
+        } else {
+            tail.push(index);
+        }
+    }
+    (parallel, tail)
+}
+
+/// Assigns the parallel jobs to the given devices. A pinned job goes to its
+/// device; the rest use longest-processing-time-first on `job_weight`, so the
+/// heaviest frames are placed first onto the least loaded device.
+fn assign_jobs(jobs: &[Job], parallel: &[usize], gpus: &[u32]) -> Result<Vec<Vec<usize>>> {
+    if gpus.is_empty() {
+        return Err("--gpus needs at least one device".into());
+    }
+    let mut slices: Vec<Vec<usize>> = vec![Vec::new(); gpus.len()];
+    let mut load: Vec<u64> = vec![0; gpus.len()];
+    let mut loose: Vec<usize> = Vec::new();
+    for index in parallel {
+        match jobs[*index].gpu {
+            None => loose.push(*index),
+            Some(device) => {
+                let at = gpus.iter().position(|entry| *entry == device).ok_or_else(|| {
+                    format!(
+                        "job {}: gpu {device} is not in --gpus {}",
+                        jobs[*index].id,
+                        gpus.iter().map(u32::to_string).collect::<Vec<_>>().join(",")
+                    )
+                })?;
+                load[at] += job_weight(&jobs[*index]);
+                slices[at].push(*index);
+            }
+        }
+    }
+    loose.sort_by_key(|index| std::cmp::Reverse(job_weight(&jobs[*index])));
+    for index in loose {
+        let at = load
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, weight)| **weight)
+            .map(|(at, _)| at)
+            .unwrap_or(0);
+        load[at] += job_weight(&jobs[index]);
+        slices[at].push(index);
+    }
+    // Keep list order inside a slice, so a slice log reads like the full list.
+    for slice in slices.iter_mut() {
+        slice.sort_unstable();
+    }
+    Ok(slices)
+}
+
+/// Runs the parallel jobs on one worker process per device, then the dependent
+/// jobs in this process. A failed worker stops the run and leaves the other
+/// worker's artifacts on disk.
+pub async fn run_jobs_on_gpus(list_path: &Path, gpus: &[u32]) -> Result<Value> {
+    let (doc, base, plan_dir, jobs) = read_list(list_path)?;
+    let entries = doc
+        .get("jobs")
+        .and_then(Value::as_array)
+        .cloned()
+        .ok_or("job list: jobs array")?;
+    let (parallel, tail) = parallel_and_tail(&jobs);
+    if parallel.is_empty() || gpus.len() < 2 {
+        return run_parsed(plan_dir, &jobs).await;
+    }
+    let slices = assign_jobs(&jobs, &parallel, gpus)?;
+    let plan_ref = doc
+        .get("plan")
+        .cloned()
+        .ok_or("job list: plan")?;
+    let binary = match std::env::var("KAI_BATCH_WORKER_BIN") {
+        Ok(path) => PathBuf::from(path),
+        Err(_) => std::env::current_exe()?,
+    };
+
+    let started = Instant::now();
+    let mut spawned = Vec::new();
+    for (at, device) in gpus.iter().enumerate() {
+        if slices[at].is_empty() {
+            continue;
+        }
+        let ids: Vec<String> = slices[at].iter().map(|index| jobs[*index].id.clone()).collect();
+        // Name the slice by worker position: `--gpus 0,0` runs two workers on
+        // one device, so a device-derived name would collide.
+        let slice_path = base.join(format!("jobs.worker{at}.json"));
+        let slice = json!({
+            "kind": JOBLIST_KIND,
+            "plan": plan_ref,
+            "jobs": slices[at].iter().map(|index| entries[*index].clone()).collect::<Vec<_>>(),
+        });
+        fs::write(&slice_path, serde_json::to_vec_pretty(&slice)?)?;
+        // A private TMPDIR per worker: the SP1 GPU prover extracts its helper
+        // binary and uses temporary files there, so concurrent workers must not
+        // share one directory.
+        let worker_tmp = std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_string());
+        let worker_tmp = PathBuf::from(worker_tmp).join(format!("worker-{at}"));
+        fs::create_dir_all(&worker_tmp)?;
+        let child = Command::new(&binary)
+            .arg("serve")
+            .arg("--jobs")
+            .arg(&slice_path)
+            .env("CUDA_VISIBLE_DEVICES", device.to_string())
+            .env("KAI_BATCH_GPU", device.to_string())
+            .env("TMPDIR", worker_tmp)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .map_err(|error| format!("gpu {device} worker did not start: {error}"))?;
+        eprintln!(
+            "batch: gpu {device} worker started, {} job(s): {}",
+            ids.len(),
+            ids.join(",")
+        );
+        spawned.push((*device, ids, child));
+    }
+
+    let mut workers = Vec::new();
+    let mut failed: Option<String> = None;
+    for (device, ids, child) in spawned {
+        let output = child
+            .wait_with_output()
+            .map_err(|error| format!("gpu {device} worker did not finish: {error}"))?;
+        if !output.status.success() {
+            failed = Some(format!(
+                "gpu {device} worker failed with {}; its jobs were {}; the other workers' artifacts are on disk",
+                output.status,
+                ids.join(",")
+            ));
+            continue;
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let summary: Value = stdout
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .last()
+            .ok_or_else(|| format!("gpu {device} worker printed no summary"))
+            .and_then(|line| {
+                serde_json::from_str(line)
+                    .map_err(|error| format!("gpu {device} worker summary is not JSON: {error}"))
+            })?;
+        workers.push(json!({
+            "gpu": device,
+            "jobs": ids,
+            "seconds": summary["batchWallSeconds"],
+            "planLoadSeconds": summary["planLoadSeconds"],
+            "proverInitSeconds": summary["proverInitSeconds"],
+            "oneTimeSetupSeconds": summary["oneTimeSetupSeconds"],
+            "jobs_detail": summary["jobs"],
+        }));
+    }
+    if let Some(reason) = failed {
+        return Err(reason.into());
+    }
+    let parallel_seconds = started.elapsed().as_secs_f64();
+
+    // The dependent jobs run in this process. The retained chunk proofs make
+    // this a verify-and-skip pass for the chunks and real work for the merges.
+    let tail_started = Instant::now();
+    let tail_jobs: Vec<Job> = tail.iter().map(|index| jobs[*index].clone()).collect();
+    let tail_summary = run_parsed(plan_dir, &tail_jobs).await?;
+    let tail_seconds = tail_started.elapsed().as_secs_f64();
+
+    // Merge the per-job records in list order.
+    let mut records: Vec<Value> = Vec::with_capacity(jobs.len());
+    for (index, job) in jobs.iter().enumerate() {
+        let found = if tail.contains(&index) {
+            tail_summary["jobs"]
+                .as_array()
+                .and_then(|all| all.iter().find(|record| record["id"].as_str() == Some(&job.id)))
+                .cloned()
+        } else {
+            workers
+                .iter()
+                .find(|worker| {
+                    worker["jobs"]
+                        .as_array()
+                        .map(|ids| ids.iter().any(|id| id.as_str() == Some(&job.id)))
+                        .unwrap_or(false)
+                })
+                .and_then(|worker| {
+                    worker["jobs_detail"]
+                        .as_array()
+                        .and_then(|all| all.iter().find(|record| record["id"].as_str() == Some(&job.id)))
+                        .cloned()
+                })
+        };
+        records.push(found.ok_or_else(|| format!("job {}: no record from a worker", job.id))?);
+    }
+
+    let worker_setup: f64 = workers
+        .iter()
+        .map(|worker| worker["oneTimeSetupSeconds"].as_f64().unwrap_or(0.0))
+        .sum();
+    Ok(json!({
+        "kind": "kai-volume-range-batch-result/v1",
+        "plan": tail_summary["plan"],
+        "planSha256": tail_summary["planSha256"],
+        "backend": tail_summary["backend"],
+        "gpuCount": gpus.len(),
+        "jobCount": jobs.len(),
+        "jobs": records,
+        "workers": workers,
+        "parallelJobCount": parallel.len(),
+        "parallelWallSeconds": parallel_seconds,
+        "tailSeconds": tail_seconds,
+        "planLoadSeconds": tail_summary["planLoadSeconds"],
+        "proverInitSeconds": tail_summary["proverInitSeconds"],
+        "oneTimeSetupSeconds": tail_summary["oneTimeSetupSeconds"],
+        "oneTimeSetupSecondsTotal": worker_setup + tail_summary["oneTimeSetupSeconds"].as_f64().unwrap_or(0.0),
+        "keySetupSecondsByRole": tail_summary["keySetupSecondsByRole"],
+        "batchWallSeconds": started.elapsed().as_secs_f64(),
     }))
 }
 
@@ -767,7 +1073,79 @@ mod tests {
                 .collect(),
             parameter_manifest: None,
             source_manifest: None,
+            gpu: None,
         }
+    }
+
+    fn weighted(id: &str, out: &str, bytes: usize, gpu: Option<u32>) -> Job {
+        // Unique per (process, id, size): the two balancer tests run in parallel
+        // and must not write the same frame file.
+        let dir = std::env::temp_dir().join(format!("batch-weight-{}-{id}-{bytes}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let frames = dir.join("frames.bin");
+        std::fs::write(&frames, vec![0u8; bytes]).unwrap();
+        let mut entry = job(id, "compressed", out, &[]);
+        entry.frames = frames;
+        entry.gpu = gpu;
+        entry
+    }
+
+    #[test]
+    fn splits_parallel_jobs_from_dependent_jobs() {
+        let jobs = vec![
+            job("chunk-0", "compressed", "/out/chunk-0", &[]),
+            job("chunk-1", "compressed", "/out/chunk-1", &[]),
+            job("range", "compressed", "/out/range", &[("chunk", "/out/chunk-0/proof.bin"), ("chunk", "/out/chunk-1/proof.bin")]),
+            job("root", "groth16", "/out/root", &[("range", "/out/range/proof.bin")]),
+        ];
+        let (parallel, tail) = parallel_and_tail(&jobs);
+        assert_eq!(parallel, vec![0, 1]);
+        assert_eq!(tail, vec![2, 3]);
+    }
+
+    #[test]
+    fn balances_parallel_jobs_by_frame_bytes() {
+        let jobs = vec![
+            weighted("chunk-0", "/out/c0", 4_000, None),
+            weighted("chunk-1", "/out/c1", 3_000, None),
+            weighted("chunk-2", "/out/c2", 2_000, None),
+            weighted("chunk-3", "/out/c3", 1_000, None),
+        ];
+        let slices = assign_jobs(&jobs, &[0, 1, 2, 3], &[0, 1]).expect("assign");
+        // Heaviest first onto the least loaded device: 4000+1000 and 3000+2000.
+        let weights: Vec<u64> = jobs.iter().map(job_weight).collect();
+        assert_eq!(slices[0], vec![0, 3], "weights {weights:?} slices {slices:?}");
+        assert_eq!(slices[1], vec![1, 2]);
+        let total = |slice: &Vec<usize>| slice.iter().map(|index| job_weight(&jobs[*index])).sum::<u64>();
+        assert_eq!(total(&slices[0]), total(&slices[1]));
+    }
+
+    #[test]
+    fn honours_a_pinned_device_and_refuses_an_unknown_one() {
+        let jobs = vec![
+            weighted("chunk-0", "/out/c0", 9_000, Some(1)),
+            weighted("chunk-1", "/out/c1", 100, None),
+        ];
+        let slices = assign_jobs(&jobs, &[0, 1], &[0, 1]).expect("assign");
+        assert_eq!(slices[1], vec![0]);
+        assert_eq!(slices[0], vec![1]);
+        let error = assign_jobs(&jobs, &[0, 1], &[0]).expect_err("unknown device").to_string();
+        assert!(error.contains("gpu 1 is not in --gpus 0"), "{error}");
+    }
+
+    #[test]
+    fn weighs_a_missing_frame_file_as_one() {
+        let mut entry = job("chunk-0", "compressed", "/out/c0", &[]);
+        entry.frames = PathBuf::from("/definitely/absent.frames");
+        assert_eq!(job_weight(&entry), 1);
+    }
+
+    #[test]
+    fn parses_a_device_list_and_repeats() {
+        assert_eq!(parse_gpus("0,1").unwrap(), vec![0, 1]);
+        assert_eq!(parse_gpus("0,0").unwrap(), vec![0, 0]);
+        assert!(parse_gpus("").is_err());
+        assert!(parse_gpus("gpu0").is_err());
     }
 
     #[test]
