@@ -137,6 +137,8 @@ async fn run(args: &[String]) -> Result<()> {
         client.verify(&proof, pk.verifying_key(), Some(StatusCode::SUCCESS))?;
         metrics["verificationSeconds"] = json!(verifying.elapsed().as_secs_f64());
         metrics["sdkExplicitSuccessResult"] = json!("Ok(())");
+        // This diagnostic binary builds the CPU prover above and never reads
+        // PROVER_BACKEND, so the label is accurate. Not part of the runtime host set.
         metrics["backend"] = json!("CpuProver");
     } else {
         // This command must be invoked as a new process. Its VK is freshly derived from
