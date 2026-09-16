@@ -10,13 +10,18 @@
  */
 import { isAddress, type Address } from "viem";
 
-/** The only chain this library verifies. */
+/**
+ * The reference chain id for the first SP1 volume testnet profile.
+ *
+ * It is the DEFAULT only. The chain id is carried by the terms, so a config states
+ * its own and the CLI uses that. This constant never overwrites a supplied value.
+ */
 export const SUPPORTED_CHAIN_ID = 46630;
 
 export interface PublicConfig {
   /** The user's own JSON-RPC endpoints, tried in order. */
   rpcUrls: string[];
-  /** Must be 46630. */
+  /** The chain this config targets. Carried by the terms; any positive integer. */
   chainId: number;
   /** Optional path to an encrypted keystore for submit/claim. */
   keystorePath?: string;
@@ -51,10 +56,10 @@ export function loadPublicConfig(raw: unknown): PublicConfig {
     }
   }
   const chainId = value.chainId;
-  if (chainId !== SUPPORTED_CHAIN_ID) {
-    fail("CONFIG_CHAIN", `chainId must be ${SUPPORTED_CHAIN_ID}, got ${String(chainId)}`);
+  if (typeof chainId !== "number" || !Number.isSafeInteger(chainId) || chainId <= 0) {
+    fail("CONFIG_CHAIN", `chainId must be a positive integer, got ${String(chainId)}`);
   }
-  const config: PublicConfig = { rpcUrls: [...rpcUrls], chainId: SUPPORTED_CHAIN_ID };
+  const config: PublicConfig = { rpcUrls: [...rpcUrls], chainId };
   if (value.keystorePath !== undefined) {
     if (typeof value.keystorePath !== "string" || value.keystorePath.length === 0) {
       fail("CONFIG_INVALID", "keystorePath must be a non-empty string");

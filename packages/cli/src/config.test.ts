@@ -4,7 +4,7 @@
  * Apache-2.0. Copyright 2026 Alpha Tech Organization.
  */
 import { describe, expect, it } from "vitest";
-import { loadPublicConfig } from "./config.js";
+import { loadPublicConfig, SUPPORTED_CHAIN_ID } from "./config.js";
 import { parseRaceKey, renderRaceKey } from "./race.js";
 
 const CONTROLLER = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
@@ -16,8 +16,14 @@ describe("loadPublicConfig", () => {
     expect(config.chainId).toBe(46630);
   });
 
-  it("rejects the wrong chain", () => {
-    expect(() => loadPublicConfig({ rpcUrls: ["http://127.0.0.1:8545"], chainId: 4663 })).toThrow("CONFIG_CHAIN");
+  it("honours the chain id the terms name instead of overwriting it", () => {
+    const config = loadPublicConfig({ rpcUrls: ["http://127.0.0.1:8545"], chainId: 4663 });
+    expect(config.chainId).toBe(4663);
+    expect(config.chainId).not.toBe(SUPPORTED_CHAIN_ID);
+  });
+
+  it("refuses a chain id that is not a positive integer", () => {
+    expect(() => loadPublicConfig({ rpcUrls: ["http://127.0.0.1:8545"], chainId: 0 })).toThrow("CONFIG_CHAIN");
   });
 
   it("rejects an empty rpc list", () => {
@@ -65,5 +71,15 @@ describe("parseRaceKey", () => {
 
   it("rejects a hex race id", () => {
     expect(() => parseRaceKey(`46630:${CONTROLLER}:0x1`)).toThrow("RACE_KEY_INVALID");
+  });
+});
+describe("parseRaceKey against the terms chain id", () => {
+  it("refuses a race key whose chain part differs from the terms", () => {
+    expect(() => parseRaceKey(`4663:${CONTROLLER}:7`, 46630)).toThrow("RACE_KEY_CHAIN");
+  });
+
+  it("accepts a race key whose chain part is the terms chain id", () => {
+    expect(parseRaceKey(`4663:${CONTROLLER}:7`, 4663).chainId).toBe(4663);
+    expect(renderRaceKey(parseRaceKey(`4663:${CONTROLLER}:7`, 4663))).toBe(`4663:${CONTROLLER}:7`);
   });
 });

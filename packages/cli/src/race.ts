@@ -25,13 +25,18 @@ function fail(code: string, detail: string): never {
   throw new Error(`${code}: ${detail}`);
 }
 
-/** Parses `46630:0xController:123` into a normalized race key. */
-export function parseRaceKey(raw: string): RaceKey {
+/** Parses `chainId:0xController:123` into a normalized race key.
+ *
+ * The expected chain id comes from the caller's terms (the loaded config), so a race key
+ * binds to the chain the terms name instead of to a literal. The default keeps the
+ * reference profile usable on its own.
+ */
+export function parseRaceKey(raw: string, chainId: number = SUPPORTED_CHAIN_ID): RaceKey {
   const parts = raw.split(":");
   if (parts.length !== 3) fail("RACE_KEY_INVALID", `expected chainId:controller:raceId, got ${raw}`);
   const [chainPart, controllerPart, raceIdPart] = parts as [string, string, string];
-  if (chainPart !== String(SUPPORTED_CHAIN_ID)) {
-    fail("RACE_KEY_CHAIN", `chainId must be ${SUPPORTED_CHAIN_ID}, got ${chainPart}`);
+  if (chainPart !== String(chainId)) {
+    fail("RACE_KEY_CHAIN", `chainId must be ${chainId}, got ${chainPart}`);
   }
   if (!isAddress(controllerPart, { strict: false })) {
     fail("RACE_KEY_INVALID", `controller is not an address: ${controllerPart}`);
@@ -41,7 +46,7 @@ export function parseRaceKey(raw: string): RaceKey {
   }
   const raceIdBigInt = BigInt(raceIdPart);
   return {
-    chainId: SUPPORTED_CHAIN_ID,
+    chainId,
     controller: getAddress(controllerPart).toLowerCase() as Address,
     raceId: raceIdBigInt.toString(10),
     raceIdBigInt,
