@@ -112,3 +112,19 @@ the key setup that this job paid for, and it is 0 when the key was reused.
 The command prints one batch summary as JSON: `jobCount`, `backend`, the
 per-job records, the one-time setup seconds, the per-role key setup seconds and
 `batchWallSeconds`.
+
+### Launching a long job
+
+Bound every long batch with the cgroup of a systemd user unit, not with `nohup` or a bare `setsid`:
+
+```sh
+export XDG_RUNTIME_DIR=/run/user/$(id -u)     # required, or systemd-run --user fails with
+                                              # "Failed to connect to bus: No medium found"
+systemd-run --user --unit=volume-batch -p MemoryMax=8G -p MemorySwapMax=0 --collect \
+  bash -lc 'volume-range-proof serve --jobs /work/jobs.json'
+```
+
+`MemoryMax` bounds the launcher; the prover container carries its own `--memory` and `--memory-swap`
+limits, and GPU runs also need `--shm-size 16g` and at least 22,000 MiB free on the selected GPU.
+One prover container runs at a time. A resumed batch verifies the retained proofs instead of
+re-proving them, so an interrupted run continues from the first missing job.
