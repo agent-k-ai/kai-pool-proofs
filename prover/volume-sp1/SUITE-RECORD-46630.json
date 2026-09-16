@@ -1,0 +1,112 @@
+{
+  "kind": "kai-volume-sp1-suite-record/v1",
+  "purpose": "The deployable suite constants for chain 46630. 11384's configureProtocol reads this file, not a message.",
+  "chainId": 46630,
+  "recordedAt": "2026-09-16T03:2xZ",
+  "recordedBy": "operator-pi-deepseek-2",
+  "ticket": "11382 range re-freeze for kind-2 terms",
+  "sourceCommit": "699bbf932cd95e82c968b8343259556982b5ca54",
+  "chunkSourceCommit": "598f94eb09fb5d8f5f0beb8b29ade20de5832738",
+  "rangeSourceCommit": "598f94eb09fb5d8f5f0beb8b29ade20de5832738",
+  "note": "Both guests archive the same kind-2 core terms validator. The chunk program does not move; the range program does.",
+  "chunkElf": {
+    "sha256": "65f03aa5cb1a26e6640f4a100174e721020b13450a7ffe201c8fa3d3d5ed6fbd",
+    "programVKey": "0x005d3bee64884d9a25750b3129d72cb872629015acbda8536336f655095da390",
+    "changed": false
+  },
+  "rangeElf": {
+    "sha256": "09663f779fa97ccf7f8eaa72a8b9c758874e055d1ea98aaa31007c107d876b08",
+    "programVKey": "0x000d827f4c65b22c6c3290fe00fbc6ad2ced8abd54998bfecdcf58beb7e7fab8",
+    "bytes": 364032,
+    "vkBincodeSha256": "d7d99e762876870bfaecd16d87fad25a8ec92f71e5bfcd00b9a98cef51c5cbb5",
+    "vkBincodeBytes": 104,
+    "previousProgramVKey": "0x00f9a794e2d64a86dca48bb66e37b7ee87294a7fac27fdecbbd5bd0f41f6c00a",
+    "changed": true
+  },
+  "verifier": {
+    "contract": "SP1VerifierGroth16",
+    "version": "v6.1.0",
+    "address": "0xB5baA02971a7a9f16336E4545b79aFEEA5c7429D",
+    "codeHash": "0x3dc2a522cb8c72284d7c48e88a487eacb099c9a95326b712ef2868b08b9c0a54",
+    "runtimeBytes": 8754,
+    "verifierHash": "0x4388a21c687fdd5f218d7e3d13190cac4c5355818d3605fd5fb811df468ee696",
+    "creationTx": "0xd50c3d15008d648fde47a1c5927b8ae84140098dfb9481833df4c1182a7666d4",
+    "block": 120198587,
+    "from": "0x06f58e52Ff98D534FA7043351C1679fb626a8aa3",
+    "establishedBy": "11379"
+  },
+  "circuitIdentity": "0x4388a21c687fdd5f218d7e3d13190cac4c5355818d3605fd5fb811df468ee696",
+  "circuitIdentityNote": "Equal to the verifier's VERIFIER_HASH() by design: a proof carries bytes4(circuitIdentity) as its selector and the verifier demands bytes4(VERIFIER_HASH()).",
+  "suitePreimage": {
+    "spec": "scripts/pons-volume-sp1-approved-plan.ts volumeSuitePreimage(); proofSuiteHash = keccak256(preimage)",
+    "encoding": "encodeAbiParameters([bytes32,bytes32,bytes32,address,bytes32,bytes32])",
+    "bytes": 192,
+    "words": [
+      {
+        "index": 1,
+        "type": "bytes32",
+        "label": "domain separator keccak256(toHex(\"KAI_VOLUME_SP1_SUITE_V1\"))",
+        "value": "0x27ad771c855aad54040c7b7f92213f64d7cb8a00328dc0886472fce1742dc1d6"
+      },
+      {
+        "index": 2,
+        "type": "bytes32",
+        "label": "chunkProgramVKey",
+        "value": "0x005d3bee64884d9a25750b3129d72cb872629015acbda8536336f655095da390"
+      },
+      {
+        "index": 3,
+        "type": "bytes32",
+        "label": "rangeProgramVKey",
+        "value": "0x000d827f4c65b22c6c3290fe00fbc6ad2ced8abd54998bfecdcf58beb7e7fab8"
+      },
+      {
+        "index": 4,
+        "type": "address",
+        "label": "suite.verifier, left-padded to 32 bytes",
+        "value": "0x000000000000000000000000b5baa02971a7a9f16336e4545b79afeea5c7429d"
+      },
+      {
+        "index": 5,
+        "type": "bytes32",
+        "label": "suite.verifierCodeHash",
+        "value": "0x3dc2a522cb8c72284d7c48e88a487eacb099c9a95326b712ef2868b08b9c0a54"
+      },
+      {
+        "index": 6,
+        "type": "bytes32",
+        "label": "suite.circuitIdentity",
+        "value": "0x4388a21c687fdd5f218d7e3d13190cac4c5355818d3605fd5fb811df468ee696"
+      }
+    ],
+    "preimage": "0x27ad771c855aad54040c7b7f92213f64d7cb8a00328dc0886472fce1742dc1d6005d3bee64884d9a25750b3129d72cb872629015acbda8536336f655095da390000d827f4c65b22c6c3290fe00fbc6ad2ced8abd54998bfecdcf58beb7e7fab8000000000000000000000000b5baa02971a7a9f16336e4545b79afeea5c7429d3dc2a522cb8c72284d7c48e88a487eacb099c9a95326b712ef2868b08b9c0a544388a21c687fdd5f218d7e3d13190cac4c5355818d3605fd5fb811df468ee696",
+    "preimageSha256": "572e0be164b1d5f384c9915b8395eee86352580931ed729fed3a3d75e09185a0",
+    "proofSuiteHash": "0x9e4d1f8fea474949376c71febbdfd6e196da3d1404c6868e8053e2655e995f07",
+    "selfCheck": {
+      "case": "the recorded synthetic verifier convention",
+      "inputs": {
+        "verifier": "0x0000000000000000000000000000000000007000",
+        "verifierCodeHash": "keccak256(toHex(\"verifier-code\"))",
+        "rangeProgramVKey": "0x00f9a794e2d64a86dca48bb66e37b7ee87294a7fac27fdecbbd5bd0f41f6c00a"
+      },
+      "preimageSha256": "a32047d413b9303ae8c6dee9f2d3a6319984f27afad3382fcc348cf3601bb31f",
+      "proofSuiteHash": "0x41985ba0b3a5662670dbfb5d2a090aaf4d5c6ba1cb2d84da879d165d583c9a14",
+      "meaning": "The same code reproduced the values 11377 published, so the word order, word 1 and the address padding are verified before the deployable inputs changed."
+    }
+  },
+  "sourceToKeyManifestSha256": "d635ca0ea7ce2ae5d9b42b4aa52284aef021e173421309b73d22eb69345ed7c0",
+  "sourceToKeyManifestArtefact": "prover build record: rebuild/build/provenance/build-files.json from the clean re-run (DRIVER_EXIT=0). It holds source commits, both ELF hashes, both host hashes and the nested source-manifest digest.",
+  "sourceToKeyManifestNote": "The field's own comment pins \"the separately retained source/ELF/VK evidence file\", so it is this record file. 0x ddc1084c... is the sha256 of its NESTED sourceManifest key, not of the file.",
+  "buildEvidence": {
+    "driverExit": 0,
+    "buildFilesJsonSha256": "d635ca0ea7ce2ae5d9b42b4aa52284aef021e173421309b73d22eb69345ed7c0",
+    "sourceManifestSha256": "ddc1084cd3b2dd749e3d987794d77fa0a0ef91edf042f4b56835e5ba3dc53699",
+    "compressedHostSha256": "d69373330675ba2c62194bbedcb35b8868cac75584d5a045a10d7ce17ccaca89",
+    "groth16HostSha256": "db0e8adec0a8a8117842b7ccd322a2bed521193a6e23bc2f24edf60d847e6442",
+    "proofGenerated": false,
+    "note": "The recorder refused the first pass with SP1_RANGE_SOURCE_MISMATCH and accepted the second, so the pins are confirmed by the guard, not asserted."
+  },
+  "termsDomain": null,
+  "rulesHash": null,
+  "termsNote": "UNPUBLISHED BY 11377. Named, not filled. Epic 10165 section 10 item 3 owns publication."
+}
