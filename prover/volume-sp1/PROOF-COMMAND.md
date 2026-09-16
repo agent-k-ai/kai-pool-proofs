@@ -131,6 +131,11 @@ Paths in the list resolve against the directory of the list file.
 }
 ```
 
+The list is validated before the plan is loaded and before any proving work: job ids and output
+directories must be unique, and every child must be an existing file or the output of an earlier job
+in the same list. A child that names a later job fails with the producer named, and a `groth16` job
+must list children.
+
 `form` defaults to `compressed`. A compressed job needs `role` (chunk or range).
 A range or Groth16 job with `children` builds its frame file from those child
 proofs when the file is missing, byte-identical to the `assemble` phase.

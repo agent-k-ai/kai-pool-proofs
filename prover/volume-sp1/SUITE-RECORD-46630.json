@@ -159,6 +159,12 @@
       "gpuValidation": "3 jobs in one process, cuda, gpubox GPU 0: batch wall 51.0 s, plan load 8.4 s, prover init 0.9 s, key setup 25.5 s (chunk) + 0.08 s (range), prove 3.33 + 3.32 + 4.31 s, job walls 30.1 + 4.6 + 6.9 s, backend CudaProver.",
       "race1Projection": "Race 1 job set: measured per-job job wall 2785 s (setup 1269 s, proves 825 s). Batch pays the setup once: projected about 875 s (~15 min) on one RTX 3090.",
       "reviewFixes": "task 11392 review item 2: prover_backend::backend() fails closed on a non-Unicode value, and metrics.json backend label comes from the parsed backend instead of a hardcoded CpuProver, in the per-job and batch paths."
+    },
+    "batchValidation": {
+      "note": "Task 11399: the batch job list is validated before the plan load (unique ids and output directories; every child is an existing file or the output of an earlier job; a groth16 job lists children), the frame-read errors name the job and the path, and tests/batch_resume.rs covers resume/skip, a foreign proof, a corrupt proof and a mid-batch failure.",
+      "branch": "feat/11399-batch-validation",
+      "compressedHostSha256": "4438f9c229fb8d7023aaaa97ec389a9b8ae835791e7ac224e529404b5d89a91e",
+      "groth16HostSha256": "22de015650a973214ac70617003442f5228c12cc264b0af05272390daf7e4809"
     }
   }
 }

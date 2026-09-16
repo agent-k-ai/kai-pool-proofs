@@ -22,7 +22,7 @@ use sp1_sdk::{
     SP1ProofWithPublicValues, SP1Proof, SP1Stdin, StatusCode,
 };
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     error::Error,
     fs,
     path::{Path, PathBuf},
@@ -62,6 +62,82 @@ fn str_field(v: &Value, key: &str) -> Result<String> {
         .and_then(Value::as_str)
         .map(str::to_owned)
         .ok_or_else(|| format!("job list: missing string field {key}").into())
+}
+
+/// Rejects a job list that cannot run in order. Call it before the plan load, so
+/// a bad list fails before any proving work.
+///
+/// Rules:
+/// - every job id is unique;
+/// - every output directory is unique, so no job overwrites another job's artifacts;
+/// - every child is either an existing file or the output of an earlier job in
+///   the same list, and no job consumes its own output;
+/// - a `groth16` job consumes children.
+fn validate_jobs(jobs: &[Job]) -> Result<()> {
+    if jobs.is_empty() {
+        return Err("job list: no jobs".into());
+    }
+    let mut ids: BTreeSet<&str> = BTreeSet::new();
+    let mut outs: BTreeSet<&Path> = BTreeSet::new();
+    for job in jobs {
+        if !ids.insert(job.id.as_str()) {
+            return Err(format!("job list: duplicate job id {}", job.id).into());
+        }
+        if !outs.insert(job.out.as_path()) {
+            return Err(format!(
+                "job {}: output {} is used by another job",
+                job.id,
+                job.out.display()
+            )
+            .into());
+        }
+        if job.form == "groth16" && job.children.is_empty() {
+            return Err(format!("job {}: a groth16 job needs children", job.id).into());
+        }
+    }
+    // Which job produces which proof, so a child can name its producer.
+    let producers: BTreeMap<PathBuf, &str> = jobs
+        .iter()
+        .map(|job| (job.out.join("proof.bin"), job.id.as_str()))
+        .collect();
+    for (index, job) in jobs.iter().enumerate() {
+        for (role, path) in &job.children {
+            if path == &job.out.join("proof.bin") {
+                return Err(format!("job {}: it lists its own proof as a child", job.id).into());
+            }
+            match producers.get(path) {
+                Some(producer) => {
+                    let at = jobs
+                        .iter()
+                        .position(|candidate| candidate.id == *producer)
+                        .unwrap_or(usize::MAX);
+                    if at >= index {
+                        return Err(format!(
+                            "job {} ({} child): {} is produced later by job {}; move job {} before job {}",
+                            job.id,
+                            plan::role_name(*role),
+                            path.display(),
+                            producer,
+                            producer,
+                            job.id
+                        )
+                        .into());
+                    }
+                }
+                None if !path.is_file() => {
+                    return Err(format!(
+                        "job {} ({} child): {} is not produced by an earlier job and does not exist",
+                        job.id,
+                        plan::role_name(*role),
+                        path.display()
+                    )
+                    .into());
+                }
+                None => {}
+            }
+        }
+    }
+    Ok(())
 }
 
 fn parse_jobs(doc: &Value, base: &Path) -> Result<Vec<Job>> {
@@ -139,9 +215,8 @@ pub async fn run_jobs(list_path: &Path) -> Result<Value> {
     let base = list_path.parent().unwrap_or(Path::new(".")).to_path_buf();
     let plan_dir = base.join(doc.get("plan").and_then(Value::as_str).ok_or("job list: plan")?);
     let jobs = parse_jobs(&doc, &base)?;
-    if jobs.is_empty() {
-        return Err("job list: no jobs".into());
-    }
+    // Fail before the plan load and any proving work.
+    validate_jobs(&jobs)?;
 
     let t0 = Instant::now();
     let plan = Plan::load(&plan_dir).await?;
@@ -310,7 +385,14 @@ async fn run_compressed(
             fs::write(&job.frames, &bytes)?;
             bytes
         }
-        Err(error) => return Err(error.into()),
+        Err(error) => {
+            return Err(format!(
+                "job {}: cannot read frames {}: {error}",
+                job.id,
+                job.frames.display()
+            )
+            .into())
+        }
     };
     let f = plan::frames(&input)?;
     let expected = plan.expected(role, &f)?;
@@ -443,8 +525,15 @@ async fn run_groth16(
     }
     let input = match fs::read(&job.frames) {
         Ok(bytes) => bytes,
-        Err(_) => {
-            let (bytes, _identities) = plan::assemble_frames(plan, &child_argument(&job.children))?;
+        Err(error) => {
+            let (bytes, _identities) = plan::assemble_frames(plan, &child_argument(&job.children))
+                .map_err(|build| {
+                    format!(
+                        "job {}: cannot read frames {} ({error}) and cannot build them from children: {build}",
+                        job.id,
+                        job.frames.display()
+                    )
+                })?;
             if let Some(dir) = job.frames.parent() {
                 fs::create_dir_all(dir)?;
             }
@@ -659,4 +748,93 @@ async fn run_groth16(
         "proofBytesSha256": m["proofBytesSha256"],
         "publicValuesSha256": m["publicValuesSha256"],
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn job(id: &str, form: &str, out: &str, children: &[(&str, &str)]) -> Job {
+        Job {
+            id: id.to_string(),
+            form: form.to_string(),
+            role: Some(if form == "groth16" { Role::Range } else { Role::Chunk }),
+            frames: PathBuf::from("/frames/x.frames"),
+            out: PathBuf::from(out),
+            children: children
+                .iter()
+                .map(|(role, path)| (plan::role(role).unwrap(), PathBuf::from(path)))
+                .collect(),
+            parameter_manifest: None,
+            source_manifest: None,
+        }
+    }
+
+    #[test]
+    fn accepts_an_ordered_list() {
+        let jobs = vec![
+            job("chunk-0", "compressed", "/out/chunk-0", &[]),
+            job("chunk-1", "compressed", "/out/chunk-1", &[]),
+            job("range", "compressed", "/out/range", &[("chunk", "/out/chunk-0/proof.bin"), ("chunk", "/out/chunk-1/proof.bin")]),
+        ];
+        assert!(validate_jobs(&jobs).is_ok());
+    }
+
+    #[test]
+    fn rejects_a_child_that_is_produced_later() {
+        let jobs = vec![
+            job("range", "compressed", "/out/range", &[("chunk", "/out/chunk-0/proof.bin")]),
+            job("chunk-0", "compressed", "/out/chunk-0", &[]),
+        ];
+        let error = validate_jobs(&jobs).expect_err("must reject").to_string();
+        assert!(error.contains("job range"), "{error}");
+        assert!(error.contains("produced later by job chunk-0"), "{error}");
+    }
+
+    #[test]
+    fn rejects_a_child_that_no_job_produces_and_that_is_missing() {
+        let jobs = vec![job("range", "compressed", "/out/range", &[("chunk", "/out/absent/proof.bin")])];
+        let error = validate_jobs(&jobs).expect_err("must reject").to_string();
+        assert!(error.contains("job range (chunk child)"), "{error}");
+        assert!(error.contains("does not exist"), "{error}");
+    }
+
+    #[test]
+    fn rejects_a_self_child() {
+        let jobs = vec![job("range", "compressed", "/out/range", &[("range", "/out/range/proof.bin")])];
+        let error = validate_jobs(&jobs).expect_err("must reject").to_string();
+        assert!(error.contains("its own proof"), "{error}");
+    }
+
+    #[test]
+    fn rejects_duplicate_ids_and_outputs() {
+        let jobs = vec![
+            job("chunk-0", "compressed", "/out/a", &[]),
+            job("chunk-0", "compressed", "/out/b", &[]),
+        ];
+        assert!(validate_jobs(&jobs).expect_err("duplicate id").to_string().contains("duplicate job id"));
+        let jobs = vec![
+            job("chunk-0", "compressed", "/out/a", &[]),
+            job("chunk-1", "compressed", "/out/a", &[]),
+        ];
+        assert!(validate_jobs(&jobs).expect_err("duplicate out").to_string().contains("used by another job"));
+    }
+
+    #[test]
+    fn rejects_an_empty_list_and_a_groth16_job_without_children() {
+        assert!(validate_jobs(&[]).expect_err("empty").to_string().contains("no jobs"));
+        let jobs = vec![job("root", "groth16", "/out/root", &[])];
+        assert!(validate_jobs(&jobs).expect_err("no children").to_string().contains("needs children"));
+    }
+
+    #[test]
+    fn accepts_a_child_that_exists_on_disk() {
+        let dir = std::env::temp_dir().join(format!("batch-validate-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let proof = dir.join("proof.bin");
+        std::fs::write(&proof, b"retained").unwrap();
+        let jobs = vec![job("range", "compressed", "/out/range", &[("chunk", proof.to_str().unwrap())])];
+        assert!(validate_jobs(&jobs).is_ok());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
