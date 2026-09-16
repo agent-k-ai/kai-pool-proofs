@@ -65,7 +65,7 @@ explicit external configuration. The reviewed b84fdd3 ABI is not a deployment.
 
 ## Provenance
 
-The integration imports exact range commit 9a12b81f3587ccc4e903593fbd52c5ebeb7349eb
+The integration imports exact range commit 598f94eb09fb5d8f5f0beb8b29ade20de5832738
 and exact public support e3fc6445c54b21c49815ea73660af53faa7e5530 as merge parents;
 the initial merge is conflict-free. Preserve their author commits. Range RR-1 is
 closed by synchronizing the prover marker to its unchanged workspace release e.

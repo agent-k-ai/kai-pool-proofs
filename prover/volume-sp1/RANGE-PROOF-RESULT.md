@@ -84,9 +84,9 @@ No source/manifest identity is inserted into its own guest build.
 | Identity | Value |
 | --- | --- |
 | Chunk ELF, 307,088 bytes, SHA-256 | `65f03aa5cb1a26e6640f4a100174e721020b13450a7ffe201c8fa3d3d5ed6fbd` |
-| Range ELF, 362,888 bytes, SHA-256 | `1d9d837677c3f363f3b7a0ee9f7117a3d1cdbc23d0c18df61727fe6872a8aadd` |
+| Range ELF, 364,032 bytes, SHA-256 | `09663f779fa97ccf7f8eaa72a8b9c758874e055d1ea98aaa31007c107d876b08` |
 | Chunk SDK program VK bytes32 | `0x005d3bee64884d9a25750b3129d72cb872629015acbda8536336f655095da390` |
-| Range SDK program VK bytes32 | `0x00f9a794e2d64a86dca48bb66e37b7ee87294a7fac27fdecbbd5bd0f41f6c00a` |
+| Range SDK program VK bytes32 | `0x000d827f4c65b22c6c3290fe00fbc6ad2ced8abd54998bfecdcf58beb7e7fab8` |
 | Chunk serialized VK SHA-256 | `2f4d5de3b60fe2cd2bf1a5a90efa68370c44ae1eb3994a429c0cd44b3445b5b3` |
 | Range serialized VK SHA-256 | `16f5ec78bbaaa8ba211dc5a0ada672df3b78ee7c354d91cb257b694f413f3a48` |
 | Suite preimage, 192 bytes, SHA-256 | `a32047d413b9303ae8c6dee9f2d3a6319984f27afad3382fcc348cf3601bb31f` |

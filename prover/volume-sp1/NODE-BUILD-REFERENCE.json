@@ -33,9 +33,9 @@
     "programVKey": "0x005d3bee64884d9a25750b3129d72cb872629015acbda8536336f655095da390"
   },
   "rangeElf": {
-    "sourceCommit": "9a12b81f3587ccc4e903593fbd52c5ebeb7349eb",
-    "sha256": "1d9d837677c3f363f3b7a0ee9f7117a3d1cdbc23d0c18df61727fe6872a8aadd",
-    "programVKey": "0x00f9a794e2d64a86dca48bb66e37b7ee87294a7fac27fdecbbd5bd0f41f6c00a"
+    "sourceCommit": "598f94eb09fb5d8f5f0beb8b29ade20de5832738",
+    "sha256": "09663f779fa97ccf7f8eaa72a8b9c758874e055d1ea98aaa31007c107d876b08",
+    "programVKey": "0x000d827f4c65b22c6c3290fe00fbc6ad2ced8abd54998bfecdcf58beb7e7fab8"
   },
   "publicGuestToolchain": {
     "sourceCommit": "c7149403db5f6f72f410d6dffcee90378235f23b",

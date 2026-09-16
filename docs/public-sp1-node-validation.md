@@ -31,7 +31,7 @@ verified an actual retained compressed chunk and final Groth16 bundle, rejected
 unary range wrapping and reassembled the multilevel input byte for byte.
 
 The range guest was rebuilt after the host-only lock/version change and is
-byte-identical: `1d9d837677c3f363f3b7a0ee9f7117a3d1cdbc23d0c18df61727fe6872a8aadd`.
+byte-identical: `09663f779fa97ccf7f8eaa72a8b9c758874e055d1ea98aaa31007c107d876b08`.
 All 68 reviewed guest/core/range/build files and workspace package metadata retain
 their original bytes. The VERSION marker now agrees with guest workspace e. The validated host remains
 release f. Release g fixed EIP-1559 tip-cap preflight; node release 20260913a
