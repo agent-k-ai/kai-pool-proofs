@@ -14,6 +14,9 @@ use sp1_sdk::{
     SP1ProofWithPublicValues, SP1PublicValues, SP1Stdin, StatusCode, SP1_CIRCUIT_VERSION,
 };
 use std::{error::Error, fs, io::Read, path::Path, time::Instant};
+
+#[path = "../prover_backend.rs"]
+mod prover_backend;
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 // SDK 6.7.0 embeds the runner override at BUILD time. A runtime environment
 // variable cannot relocate it. Refuse a different path instead of silently
@@ -96,6 +99,8 @@ fn cache_gate(manifest: &[u8]) -> Result<Value> {
 }
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<()> {
+    // An unknown PROVER_BACKEND must fail here, before any output or proving work.
+    prover_backend::backend()?;
     runner_binding()?;
     let a: Vec<_> = std::env::args().collect();
     if a.len() < 8
@@ -208,10 +213,7 @@ async fn main() -> Result<()> {
         m["children"] = json!(children);
         fs::write(out.join("stdin.bin"), raw)?;
         let t = Instant::now();
-        let cpu: sp1_sdk::env::EnvProver = match std::env::var("PROVER_BACKEND").as_deref() {
-            Ok("cuda") => sp1_sdk::env::EnvProver::Cuda(ProverClient::builder().cuda().build().await),
-            _ => sp1_sdk::env::EnvProver::Cpu(ProverClient::builder().cpu().build().await),
-        };
+        let cpu = prover_backend::build_prover().await?;
         let pk = cpu.setup(Elf::from(data[1].clone())).await?;
         if bincode::serialize(pk.verifying_key())? != bincode::serialize(rvk)? {
             return Err("CPU/Light VK mismatch".into());

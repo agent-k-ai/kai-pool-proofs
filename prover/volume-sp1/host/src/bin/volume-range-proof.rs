@@ -18,6 +18,9 @@ use sp1_sdk::{
     SP1_CIRCUIT_VERSION,
 };
 use std::{error::Error, fs, path::Path, time::Instant};
+
+#[path = "../prover_backend.rs"]
+mod prover_backend;
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 const CHUNK_ELF_SHA256: &str = "65f03aa5cb1a26e6640f4a100174e721020b13450a7ffe201c8fa3d3d5ed6fbd";
 // SDK 6.7.0 embeds the runner override at BUILD time. A runtime environment
@@ -552,10 +555,7 @@ async fn run(a: &[String]) -> Result<()> {
             return Ok(());
         }
         let t = Instant::now();
-        let cpu: sp1_sdk::env::EnvProver = match std::env::var("PROVER_BACKEND").as_deref() {
-            Ok("cuda") => sp1_sdk::env::EnvProver::Cuda(ProverClient::builder().cuda().build().await),
-            _ => sp1_sdk::env::EnvProver::Cpu(ProverClient::builder().cpu().build().await),
-        };
+        let cpu = prover_backend::build_prover().await?;
         let pk = cpu.setup(Elf::from(plan.elf(r).to_vec())).await?;
         if bincode::serialize(pk.verifying_key())? != bincode::serialize(plan.vk(r))? {
             return Err("CPU/Light fresh VK mismatch".into());
@@ -605,6 +605,8 @@ async fn run(a: &[String]) -> Result<()> {
 }
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<()> {
+    // An unknown PROVER_BACKEND must fail here, before any output or proving work.
+    prover_backend::backend()?;
     runner_binding()?;
     safety()?;
     sp1_sdk::setup_logger();

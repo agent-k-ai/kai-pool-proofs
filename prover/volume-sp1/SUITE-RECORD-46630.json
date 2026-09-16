@@ -122,5 +122,33 @@
     "reproducedBy": "cast keccak in the pinned foundry image; matches the decision note exactly",
     "authority": "alloyium-dev decisions/prediction-pools/testnet-protocol-identity-tags-20260913 (authority: authoritative)"
   },
-  "termsNote": "Explicit namespace/version tags, NOT content hashes of source files. The guest program keys, the suite preimage, the verified runtime and the immutable race terms bind behaviour separately. Decided 2026-09-13 (authoritative note); never carried into the guest line records until now, so 11377s unpublished statement was true of 11377 and not of the fleet. Do not relabel old synthetic proof evidence."
+  "termsNote": "Explicit namespace/version tags, NOT content hashes of source files. The guest program keys, the suite preimage, the verified runtime and the immutable race terms bind behaviour separately. Decided 2026-09-13 (authoritative note); never carried into the guest line records until now, so 11377s unpublished statement was true of 11377 and not of the fleet. Do not relabel old synthetic proof evidence.",
+  "runtimeHosts": {
+    "note": "SP1 host binaries for the CUDA runtime path. PROVER_BACKEND selects the prover: unset or \"cpu\" -> CpuProver, \"cuda\" -> CudaProver, any other value is a hard error before proving. Guests, program keys, the suite, the terms and the plan format do not depend on this.",
+    "backendFeature": "sp1-sdk feature \"cuda\"",
+    "buildSourceCommit": "5c5e6e45b1954cfc810807448d31334f69e5eabf",
+    "branch": "feat/11391-cuda-hosts",
+    "buildImage": "sha256:25377190a4580d1f3708b56f92a83881f6db1d5056bd4a9872852f70ff07141d",
+    "buildCommand": "cargo build --offline --locked --release -j 8 -p volume-chunk-host --bin volume-range-proof --bin volume-range-groth16 --features groth16-native",
+    "runnerPin": "/hb/sp1-core-executor-runner-binary",
+    "race1WindowProof11391": {
+      "note": "The task 11391 race-1 window proof used this pair. volume-range-proof carries CHUNK_ELF_SHA256 65f03aa5; volume-range-groth16 has no chunk-ELF constant.",
+      "commit": "3e293c3274b7fba83b6c1e73748c6cbdc543d2c9",
+      "compressedHostSha256": "a7db4d194bef31d6d45e90e7a99bf7baeda9978943d418c5a74dbe5b997881b0",
+      "groth16HostSha256": "7c4acb9efdf6a6e1094abed210282ef3d08929dd7c7a29a054625b01fe2cfb53"
+    },
+    "strictBackendParse": {
+      "note": "Same source with strict PROVER_BACKEND parsing (task 11392 fix). Rebuild of this entry.",
+      "compressedHostSha256": "f26795649bd168ec6a8fa1144a54e4e30e76a65cfc1be15571381e3d31a4cba2",
+      "groth16HostSha256": "9c46e62cc0cec2403a93ee398d0d87c012e5645c4b59f28939eeb6bb371d848a",
+      "compressedHostChunkElfPinOccurrences": 2,
+      "groth16HostChunkElfPinOccurrences": 0,
+      "cudaMarkers": 13,
+      "unitTests": "cargo test -p volume-chunk-host --bin volume-range-proof --bin volume-range-groth16 --features groth16-native: 4 passed in each target, 0 failed",
+      "runtimeProbe": [
+        "PROVER_BACKEND unset | cpu | cuda -> argument error, proving not reached",
+        "PROVER_BACKEND=GPU -> exit 1, Error: PROVER_BACKEND \"GPU\" is not accepted; accepted values: cpu, cuda (default cpu)"
+      ]
+    }
+  }
 }

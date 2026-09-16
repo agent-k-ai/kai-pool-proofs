@@ -15,6 +15,7 @@ cargo build --offline --locked --release -j 8 -p volume-chunk-host --bin volume-
 ```
 
 A checksum-verified retained runner built from the same lock may be used instead.
+`PROVER_BACKEND` selects the prover: `cpu` or `cuda`, default `cpu` when unset. An unrecognised value is an error and stops the host before any proving work.
 Use `scripts/cpu-serial.conf`, the unmodified retained PRICE pilot worker profile.
 This changes concurrency, not circuits. The diagnostic run is CPU-only, in one
 new non-root container, with 8 CPUs, 48 GiB RAM, memory+swap also 48 GiB, private
