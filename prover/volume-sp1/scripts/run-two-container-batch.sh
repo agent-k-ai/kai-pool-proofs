@@ -86,7 +86,16 @@ PID_A=$!
 run_container "opds2-$TAG-b" 1 "/out/${TAG}-slice-b.json" "$WORKER_CPUS" "$CPUSET_B" 4 \
   >> "$LOG_DIR/$TAG-b.log" 2>&1 &
 PID_B=$!
-wait "$PID_A" "$PID_B"
+set +e
+wait "$PID_A"
+RC_A=$?
+wait "$PID_B"
+RC_B=$?
+set -e
+if [ "$RC_A" -ne 0 ] || [ "$RC_B" -ne 0 ]; then
+  log "worker failure: container a exit=$RC_A container b exit=$RC_B; the tail does not run"
+  exit 1
+fi
 log "chunk phase wall $(( $(date +%s) - START )) s"
 
 TAIL_START=$(date +%s)

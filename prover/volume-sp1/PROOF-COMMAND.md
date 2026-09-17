@@ -158,10 +158,15 @@ single-GPU process: it owns one CUDA context and the device comes from `CUDA_VIS
 split is external and each worker starts its own gpu-server on its own device. The coordinator keeps
 the plan load, the prover and the key set inside each worker, and it gives every worker a private
 `TMPDIR`, because the prover extracts a helper binary there.
+The private directory is not enough on its own: `sp1-cuda` 6.7.0 fixes the gpu-server socket at
+`/tmp/sp1-cuda-<visible ordinal>.sock`, and the ordinal is the position inside the VISIBLE device set,
+so `CUDA_VISIBLE_DEVICES=1` still yields ordinal 0. Two CUDA workers in one container therefore both
+use `/tmp/sp1-cuda-0.sock`, the second gpu-server never listens, and the proof fails with a slop
+`AllocError`. Run one container per GPU, each with its own `/tmp`.
 
 The coordinator splits the list itself:
 
-1. Jobs that consume no child and that no other job consumes are the parallel set.
+1. Jobs that consume no child are the parallel set.
 2. Each parallel job goes to a device. A job may pin one with `"gpu": 1` in the job list; the others
    are placed by frame bytes, heaviest first onto the least loaded device (`LPT`).
 3. One worker process runs each slice; the coordinator waits for all of them.
