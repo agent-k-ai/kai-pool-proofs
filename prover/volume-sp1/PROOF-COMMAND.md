@@ -174,6 +174,15 @@ slice, and leaves the other workers' artifacts on disk. A second run resumes the
 Safety does not change: check both devices are free (at least 22,000 MiB each), record the idle
 evidence for every vLLM instance, keep `--shm-size 16g`, and never overwrite a retained artifact.
 
+Run one container per GPU and give each worker one CCD: `scripts/split-two-container-jobs.py` writes the
+two slice lists and the tail list, and `scripts/run-two-container-batch.sh` runs the three containers.
+The measured shape pins the slices to the disjoint cpusets `0-5,12-17` and `6-11,18-23` with `--cpus 12`
+each on the 12-core gpubox host; set `CPUSET_A` and `CPUSET_B` empty to run without the pinning. On the
+4-chunk mainnet subset (2026-09-16, plan `b4027bae...`) the chunk phase took 392 s with the cpusets,
+431 s without them at the same quota and 422 s for the earlier unpinned `--cpus 4` run, against 564 s
+for one worker. Record the host load with the result, because every run that night shared the host with
+other jobs at load 19-30 on 24 threads.
+
 `--gpus 0,0` runs two workers on one device. The CPU-mode test uses this to compare the split result
 with the single-worker result. `KAI_BATCH_WORKER_BIN` names the worker binary; a test sets it because
 its own executable is the test harness.
