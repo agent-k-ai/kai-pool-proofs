@@ -5,7 +5,9 @@
 #   case 1  default shape   one cpuset per container (0-5,12-17, 6-11,18-23, tail 0-5,12-17) and
 #                           exactly one --cpus 12 per container; the tail starts last
 #   case 2  empty CPUSET_*  no --cpuset-cpus at all, still exactly one --cpus 12 per container
-#   case 3  failed worker   the script exits non-zero and the tail container does not start
+#   case 3  failed worker   worker a fails: the script exits non-zero and the tail container does
+#                           not start. The failing worker must be a, because `wait A B` returns the
+#                           LAST status only, so a failure in b hides that bug.
 #
 # Red on mutation: change CPUSET_A/CPUSET_B/CPUSET_TAIL to the ${VAR:-default} form and case 2 fails,
 # because an intentionally empty value becomes the default again. Drop one --cpus flag and case 1
@@ -105,14 +107,14 @@ if [ "$(count "$ROOT/out-unpinned/stub.log" '--cpuset-cpus')" != "0" ]; then
 fi
 
 CASE=3
-if run_runner "$ROOT/out-failed" failed FAIL_WORKER=b; then
-  fail "case 3: the script must exit non-zero when a worker fails"
+if run_runner "$ROOT/out-failed" failed FAIL_WORKER=a; then
+  fail "case 3: the script must exit non-zero when worker a fails"
 fi
 if [ "$(count "$ROOT/out-failed/stub.log" '--name opds2-')" != "2" ]; then
   fail "case 3: expected 2 container calls, no tail"
 fi
 if grep -Eq -- '--name [^ ]*-tail( |$)' "$ROOT/out-failed/stub.log"; then
-  fail "case 3: the tail container must not start after a worker failure"
+  fail "case 3: the tail container must not start after worker a fails"
 fi
 
 if [ "$FAILURES" -ne 0 ]; then

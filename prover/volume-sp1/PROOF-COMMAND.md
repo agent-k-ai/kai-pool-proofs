@@ -187,6 +187,8 @@ each on the 12-core gpubox host; set `CPUSET_A` and `CPUSET_B` empty to run with
 431 s without them at the same quota and 422 s for the earlier unpinned `--cpus 4` run, against 564 s
 for one worker. Record the host load with the result, because every run that night shared the host with
 other jobs at load 19-30 on 24 threads.
+`scripts/tests/test-run-two-container-batch.sh` checks that docker call with a stub `docker` on
+`PATH`; `scripts/smoke.sh` runs the test.
 
 `--gpus 0,0` runs two workers on one device. The CPU-mode test uses this to compare the split result
 with the single-worker result. `KAI_BATCH_WORKER_BIN` names the worker binary; a test sets it because

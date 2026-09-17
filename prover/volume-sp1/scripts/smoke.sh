@@ -26,3 +26,6 @@ for volume_case in synthetic-corrupt-node synthetic-malformed-late-log synthetic
     "$CARGO_TARGET_DIR/debug/volume-chunk-host" reject "$volume_elf" \
         "$volume_output/fixtures/$volume_case.frames" "$volume_output/$volume_case"
 done
+# The two-container runner builds a docker call. A stub docker on PATH checks the argv, so this
+# needs no GPU, no image and no daemon.
+TEST_TMP_ROOT="$volume_output" bash scripts/tests/test-run-two-container-batch.sh
