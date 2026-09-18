@@ -20,6 +20,11 @@
 #                                  reuses CPUSET_A). Set empty to disable the pinning.
 #   SPLITTER         path to split-two-container-jobs.py (default: next to this script)
 #
+# Bind mounts use the --mount form on purpose. `docker run -v SRC:TGT` creates a missing SRC as a
+# root-owned empty directory and starts the container with an empty mount, so a mistyped PARAMS_DIR
+# silently runs against empty parameters. `--mount type=bind` fails with exit 125 and "bind source
+# path does not exist: SRC" instead. $OUT and $SP1_HOME stay writable; the other six stay read-only.
+#
 # Safety: free the device first. Both cards must show at least 22,000 MiB free, and every host
 # inference server must report no running request. Keep --shm-size 16g. Never overwrite a retained
 # artifact. Bound this script with a systemd user unit, and read the caller's load average with the
@@ -65,11 +70,14 @@ run_container() {
   docker run --rm --name "$name" --user 1000:1000 --gpus "device=$gpu" $(cpuset_flag "$cpuset") \
     --cpus "$cpus" --memory 48318382080 --memory-swap 48318382080 \
     --shm-size 16g --network none --read-only --tmpfs /tmp:rw,size=8g \
-    -v "$PLAN":/plan:ro -v "$FRAMES":/frames:ro -v "$OUT":/out \
-    -v "$HOST_DIR/volume-range-groth16":/usr/local/bin/volume-range-groth16:ro \
-    -v "$HOST_DIR/sp1-core-executor-runner-binary":/hb/sp1-core-executor-runner-binary:ro \
-    -v "$PARAMS_DIR":/params:ro -v "$MANIFEST":/plan-params/PARAMETER-MANIFEST.json:ro \
-    -v "$SP1_HOME":/home/sp1 \
+    --mount type=bind,source="$PLAN",target=/plan,readonly \
+    --mount type=bind,source="$FRAMES",target=/frames,readonly \
+    --mount type=bind,source="$OUT",target=/out \
+    --mount type=bind,source="$HOST_DIR/volume-range-groth16",target=/usr/local/bin/volume-range-groth16,readonly \
+    --mount type=bind,source="$HOST_DIR/sp1-core-executor-runner-binary",target=/hb/sp1-core-executor-runner-binary,readonly \
+    --mount type=bind,source="$PARAMS_DIR",target=/params,readonly \
+    --mount type=bind,source="$MANIFEST",target=/plan-params/PARAMETER-MANIFEST.json,readonly \
+    --mount type=bind,source="$SP1_HOME",target=/home/sp1 \
     -e HOME=/home/sp1 -e SP1_PROVER=cuda -e PROVER_BACKEND=cuda -e CUDA_VISIBLE_DEVICES=0 \
     -e RUST_LOG=info -e SP1_CORE_RUNNER_OVERRIDE_BINARY=/hb/sp1-core-executor-runner-binary \
     -e SP1_GROTH16_CIRCUIT_PATH=/params -e WITHOUT_VK_VERIFICATION=false -e SP1_CIRCUIT_MODE=release \
