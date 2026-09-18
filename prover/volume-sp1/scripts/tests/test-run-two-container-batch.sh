@@ -8,10 +8,22 @@
 #   case 3  failed worker   worker a fails: the script exits non-zero and the tail container does
 #                           not start. The failing worker must be a, because `wait A B` returns the
 #                           LAST status only, so a failure in b hides that bug.
+#   case 4  missing bind source  PARAMS_DIR ends in -NOPE and does not exist. The bind mount must
+#                           fail, the script must exit non-zero, the fabricated path must NOT exist
+#                           after the run, and the worker log must name that path.
 #
 # Red on mutation: change CPUSET_A/CPUSET_B/CPUSET_TAIL to the ${VAR:-default} form and case 2 fails,
 # because an intentionally empty value becomes the default again. Drop one --cpus flag and case 1
-# fails on the "exactly one --cpus 12" count.
+# fails on the "exactly one --cpus 12" count. Change the mounts back to `-v SRC:TGT` and case 4
+# fails twice: the script exits 0 and the fabricated path appears.
+#
+# The stub emulates the two bind forms, because the argv is all this test can see without a daemon.
+# Measured on gpubox with Docker server 29.2.1 on 2026-09-18 (alpine:3, no GPU, no proving):
+#   docker run --rm --mount type=bind,source=<missing>,target=/x,readonly alpine:3 true
+#     -> exit 125, 'invalid mount config for type "bind": bind source path does not exist: <missing>'
+#     -> the missing source is not created
+#   docker run --rm -v <missing>:/x:ro alpine:3 true
+#     -> exit 0, and docker creates <missing> as an empty root-owned directory
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -31,13 +43,41 @@ mkdir -p "$ROOT/stub" "$ROOT/frames" "$ROOT/plan" "$ROOT/home"
 cat > "$ROOT/stub/docker" <<'STUB'
 #!/usr/bin/env bash
 # Record one line per container call, then fail only when FAIL_WORKER names this worker.
+#
+# The stub also emulates the bind-mount behaviour of the daemon, because the argv is all this test
+# can see without a Docker daemon:
+#   --mount type=bind,...  a missing source path fails the run with exit 125 and the daemon text
+#   -v SRC:TGT             a missing SRC is created as an empty directory and the run continues
+# The second rule is ticket 11494. Keep it: it is what makes case 4 fail when the mounts regress.
 printf '%s\n' "$*" >> "${STUB_LOG:?}"
+prev=
 for arg in "$@"; do
+  case "$prev" in
+    -v)
+      src=${arg%%:*}
+      if [ ! -e "$src" ]; then
+        mkdir -p "$src" 2>/dev/null || true
+        printf 'stub-docker: -v created missing bind source %s\n' "$src" >> "$STUB_LOG"
+      fi
+      ;;
+    --mount)
+      case "$arg" in
+        type=bind,*)
+          src=${arg#*source=}; src=${src%%,*}
+          if [ ! -e "$src" ]; then
+            printf 'docker: Error response from daemon: invalid mount config for type "bind": bind source path does not exist: %s\n' "$src" >&2
+            exit 125
+          fi
+          ;;
+      esac
+      ;;
+  esac
   case "$arg" in
     opds2-*-a|opds2-*-b)
       if [ -n "${FAIL_WORKER:-}" ] && [ "${arg##*-}" = "$FAIL_WORKER" ]; then exit 1; fi
       ;;
   esac
+  prev=$arg
 done
 exit 0
 STUB
@@ -45,6 +85,11 @@ chmod +x "$ROOT/stub/docker"
 
 head -c 4096 /dev/zero > "$ROOT/frames/frame-a.bin"
 head -c 2048 /dev/zero > "$ROOT/frames/frame-b.bin"
+# Every bind source must exist, because the daemon refuses a missing source (ticket 11494). Case 4
+# is the only case that leaves one source out, and it does so on purpose with PARAMS_DIR.
+head -c 128 /dev/zero > "$ROOT/volume-range-groth16"
+head -c 128 /dev/zero > "$ROOT/sp1-core-executor-runner-binary"
+head -c 128 /dev/zero > "$ROOT/plan/manifest.json"
 cat > "$ROOT/jobs.json" <<'JSON'
 {"kind":"kai-volume-range-batch/v1","plan":"/plan","jobs":[
  {"id":"chunk-a","role":"chunk","frames":"frame-a.bin","output":"chunk-a"},
@@ -84,13 +129,45 @@ check_container() { # stub log, worker suffix, expected cpuset, expected cpus
   fi
 }
 
+check_mounts() { # stub log, worker suffix: the eight bind mounts of the ticket-11494 shape
+  local log=$1 worker=$2 line binds reads
+  line=$(grep -E -- "--name [^ ]*-$worker( |$)" "$log" | head -1 || true)
+  if [ -z "$line" ]; then fail "case $CASE: no container for worker $worker"; return; fi
+  binds=$(printf '%s' "$line" | grep -o -- '--mount type=bind,source=' | wc -l | tr -d ' ' || true)
+  reads=$(printf '%s' "$line" | grep -o -- ',readonly' | wc -l | tr -d ' ' || true)
+  if [ "$binds" != "8" ]; then
+    fail "case $CASE: worker $worker has $binds --mount bind sources, expected 8"
+  fi
+  if [ "$reads" != "6" ]; then
+    fail "case $CASE: worker $worker has $reads read-only mounts, expected 6"
+  fi
+  if printf '%s' "$line" | grep -q -- ',target=/out,readonly'; then
+    fail "case $CASE: worker $worker must mount /out read-write"
+  fi
+  if printf '%s' "$line" | grep -q -- ',target=/home/sp1,readonly'; then
+    fail "case $CASE: worker $worker must mount /home/sp1 read-write"
+  fi
+  printf '%s' "$line" | grep -q -- "source=$ROOT/plan,target=/params,readonly" \
+    || fail "case $CASE: worker $worker does not bind PARAMS_DIR at /params read-only"
+  for target in /plan /frames /params /plan-params/PARAMETER-MANIFEST.json /usr/local/bin/volume-range-groth16 /hb/sp1-core-executor-runner-binary; do
+    printf '%s' "$line" | grep -q -- ",target=$target,readonly" \
+      || fail "case $CASE: worker $worker does not mount $target read-only"
+  done
+}
+
 CASE=1
-run_runner "$ROOT/out-default" two
+# `|| fail`: a runner failure must report a check, not abort the file under set -e.
+run_runner "$ROOT/out-default" two || fail "case 1: the runner must succeed"
 check_container "$ROOT/out-default/stub.log" a "0-5,12-17" 12
 check_container "$ROOT/out-default/stub.log" b "6-11,18-23" 12
 check_container "$ROOT/out-default/stub.log" tail "0-5,12-17" 12
+check_mounts "$ROOT/out-default/stub.log" a
+check_mounts "$ROOT/out-default/stub.log" tail
 if [ "$(count "$ROOT/out-default/stub.log" '--name opds2-')" != "3" ]; then
   fail "case 1: expected 3 container calls"
+fi
+if [ "$(count "$ROOT/out-default/stub.log" ' -v ')" != "0" ]; then
+  fail "case 1: the script must not use the -v mount form"
 fi
 if ! tail -1 "$ROOT/out-default/stub.log" | grep -Eq -- '--name [^ ]*-tail( |$)'; then
   fail "case 1: the tail container is not the last call"
@@ -98,7 +175,7 @@ fi
 grep -q "TWOCONTAINER-DONE" "$ROOT/out-default/run.log" || fail "case 1: no completion line"
 
 CASE=2
-run_runner "$ROOT/out-unpinned" unpinned CPUSET_A= CPUSET_B= CPUSET_TAIL=
+run_runner "$ROOT/out-unpinned" unpinned CPUSET_A= CPUSET_B= CPUSET_TAIL= || fail "case 2: the runner must succeed"
 check_container "$ROOT/out-unpinned/stub.log" a "" 12
 check_container "$ROOT/out-unpinned/stub.log" b "" 12
 check_container "$ROOT/out-unpinned/stub.log" tail "" 12
@@ -117,8 +194,36 @@ if grep -Eq -- '--name [^ ]*-tail( |$)' "$ROOT/out-failed/stub.log"; then
   fail "case 3: the tail container must not start after worker a fails"
 fi
 
+CASE=4
+# A path that cannot be confused with a real parameter directory, so a stray create is unmistakable.
+NOPE_PARAMS=$ROOT/parameters-NOPE
+[ ! -e "$NOPE_PARAMS" ] || fail "case 4: $NOPE_PARAMS exists before the run"
+rc4=0
+run_runner "$ROOT/out-missing-source" missingsrc PARAMS_DIR="$NOPE_PARAMS" || rc4=$?
+if [ "$rc4" -eq 0 ]; then
+  fail "case 4: the script must exit non-zero when a bind source path does not exist"
+fi
+echo "case 4: runner exit=$rc4 with a missing PARAMS_DIR"
+if [ -e "$NOPE_PARAMS" ]; then
+  fail "case 4: the missing bind source $NOPE_PARAMS was created"
+else
+  echo "case 4: $NOPE_PARAMS is still absent after the run"
+fi
+if grep -q 'stub-docker: -v created missing bind source' "$ROOT/out-missing-source/stub.log"; then
+  fail "case 4: a container call used -v and created the missing source"
+fi
+if [ "$(count "$ROOT/out-missing-source/stub.log" '--name opds2-')" != "2" ]; then
+  fail "case 4: expected the 2 worker calls and no tail"
+fi
+if ! grep -q "bind source path does not exist: $NOPE_PARAMS" "$ROOT/out-missing-source/logs/missingsrc-a.log"; then
+  fail "case 4: the worker log does not name the missing bind source $NOPE_PARAMS"
+fi
+if ! grep -q "worker failure" "$ROOT/out-missing-source/run.log"; then
+  fail "case 4: the run log does not report the worker failure"
+fi
+
 if [ "$FAILURES" -ne 0 ]; then
   echo "two-container-batch test: $FAILURES check(s) failed"
   exit 1
 fi
-echo "two-container-batch test: OK (3 cases)"
+echo "two-container-batch test: OK (4 cases)"
